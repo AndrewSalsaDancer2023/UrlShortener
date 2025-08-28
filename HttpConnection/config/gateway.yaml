@@ -1,0 +1,12 @@
+short_url_path: "/api/v1/data/shorten/"
+
+original_url_path: "/api/v1/short/{shorted_url:[a-zA-Z0-9]+}"
+original_url_path_short: "/api/v1/short/"
+
+gateway_url: "127.0.0.1:8080"
+engine_url: "127.0.0.1:8081"
+cache_url: "127.0.0.1:8082"
+
+protocol_key: "http:"
+double_separator: "//"
+post_body_key: "long_url"
