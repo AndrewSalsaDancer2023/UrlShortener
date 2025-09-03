@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"encoding/json"
 	"errors"
 	"log"
 	"net/http"
@@ -37,42 +36,27 @@ func SetupRouter(h *Handler) *mux.Router {
 
 func (h *Handler) CreateURLPair(w http.ResponseWriter, req *http.Request) {
 
-	var record utils.URLPair
-	if err := json.NewDecoder(req.Body).Decode(&record); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(err.Error()))
+	pair, err := utils.ReadURL[utils.URLPair](http.StatusBadRequest, w, req)
+	if err != nil {
 		return
 	}
 
-	urls := h.ctrl.CreateURLValuePair(record.LongURL, record.ShortURL)
-	if err := json.NewEncoder(w).Encode(urls); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
-		return
-	}
-
+	urls := h.ctrl.CreateURLValuePair(pair.LongURL, pair.ShortURL)
+	utils.WriteURL(&urls, http.StatusInternalServerError, w)
 }
 
 func (h *Handler) GetLongURL(w http.ResponseWriter, req *http.Request) {
-
 	shorted_url, ok := mux.Vars(req)["shorted_url"]
 	if !ok {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(ErrShortURLNotSpecified.Error()))
+		utils.WriteErrorResponse(http.StatusBadRequest, ErrShortURLNotSpecified.Error(), w)
 		return
 	}
 
-	val, err := h.ctrl.GetValueForURL(shorted_url)
+	longURL, err := h.ctrl.GetValueForURL(shorted_url)
 	if err != nil {
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(err.Error()))
+		utils.WriteErrorResponse(http.StatusNotFound, err.Error(), w)
 		return
 	}
 
-	resp := utils.ShortURL{URL: val}
-	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
-		return
-	}
+	utils.WriteURL(&utils.LongURL{URL: longURL}, http.StatusInternalServerError, w)
 }

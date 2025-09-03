@@ -19,11 +19,7 @@ func New() *CacheController {
 }
 
 func (cntrl *CacheController) CreateURLValuePair(longURL engine.KeyType, shortVal engine.ValueType) utils.URLPair {
-	shortURL, err := cntrl.cache.GetValueForKey(longURL)
-	if err == nil {
-		return utils.URLPair{LongURL: longURL, ShortURL: shortURL}
-	}
-	cntrl.cache.AddKeyValue(longURL, shortVal)
+	shortVal = cntrl.cache.AddKeyValue(longURL, shortVal)
 	return utils.URLPair{LongURL: longURL, ShortURL: shortVal}
 }
 

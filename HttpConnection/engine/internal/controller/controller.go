@@ -7,7 +7,7 @@ import (
 	"urlshortener.com/utils"
 )
 
-var ErrGenerateNumber = errors.New("unable generate big random number")
+var ErrGenerateNumber = errors.New("unable generate random number")
 
 const DefaultValue = ""
 

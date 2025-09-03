@@ -19,8 +19,8 @@ func main() {
 
 	engineGateway := enginegateway.New(cfg.EngineURL, cfg.ShortURLPath)
 
-	ctrl := controller.New(cacheGateway, engineGateway)
-	handler := httphandler.New(ctrl)
+	controller := controller.New(cacheGateway, engineGateway)
+	handler := httphandler.New(controller)
 	log.Println("Starting gateway service:  " + cfg.GatewayURL)
 	srv := &http.Server{Handler: handler.SetupRouter(),
 		Addr:         cfg.GatewayURL,

@@ -2,7 +2,6 @@ package handler
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"log"
 	"net/http"
@@ -39,29 +38,21 @@ func (h *Handler) SetupRouter() *mux.Router {
 }
 
 func (h *Handler) CreateShortURL(w http.ResponseWriter, r *http.Request) {
-
-	var LongURL utils.LongURL
-	if err := json.NewDecoder(r.Body).Decode(&LongURL); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(err.Error()))
+	longURL, err := utils.ReadURL[utils.LongURL](http.StatusBadRequest, w, r)
+	if err != nil {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 	defer cancel()
 
-	shortURL, err := h.ctrl.CreateShortURL(ctx, LongURL.URL)
+	shortURL, err := h.ctrl.CreateShortURL(ctx, longURL.URL)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
+		utils.WriteErrorResponse(http.StatusInternalServerError, err.Error(), w)
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(shortURL); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
-		return
-	}
+	utils.WriteURL(&shortURL, http.StatusInternalServerError, w)
 }
 
 func (h *Handler) GetOriginalURL(w http.ResponseWriter, r *http.Request) {
@@ -69,18 +60,16 @@ func (h *Handler) GetOriginalURL(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	_, ok := vars["shorted_url"]
 	if !ok {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(ErrShortURLNotSpecified.Error()))
+		utils.WriteErrorResponse(http.StatusBadRequest, ErrShortURLNotSpecified.Error(), w)
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 	defer cancel()
 
 	url, err := h.ctrl.GetOriginalURL(ctx, r.URL.Path)
 	if err != nil {
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(err.Error()))
+		utils.WriteErrorResponse(http.StatusNotFound, err.Error(), w)
 		return
 	}
 	http.Redirect(w, r, url.URL, http.StatusFound)

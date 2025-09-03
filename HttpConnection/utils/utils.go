@@ -3,6 +3,7 @@ package utils
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -19,6 +20,9 @@ const (
 var ErrURLTooLong = errors.New("URL exceed max length")
 var ErrShortURLLength = errors.New("invalid URL length")
 var ErrShortURLFormat = errors.New("invalid URL format")
+
+var ErrGetRequest = "error sending GET request: %w"
+var ErrPostRequest = "error sending POST request: %w"
 
 type URLPair struct {
 	LongURL  string `json:"long_url"`
@@ -64,20 +68,24 @@ func ValidateLongURL(rawURL string) error {
 	return nil
 }
 
+func ExecuteRequest(req *http.Request, errDescr string) (*http.Response, error) {
+	client := &http.Client{}
+	resp, err := client.Do(req)
+
+	if err != nil {
+		return nil, fmt.Errorf(errDescr, err)
+	}
+
+	return resp, nil
+}
+
 func ExecuteGetRequest(context context.Context, url string) (*http.Response, error) {
 	reqGet, err := http.NewRequestWithContext(context, "GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("invalid new GET request: %w", err)
 	}
 
-	client := &http.Client{}
-	resp, err := client.Do(reqGet)
-
-	if err != nil {
-		return nil, fmt.Errorf("error sending GET request: %w", err)
-	}
-
-	return resp, nil
+	return ExecuteRequest(reqGet, ErrGetRequest)
 }
 
 func ExecutePostRequest(context context.Context, url string, reqbody *bytes.Buffer) (*http.Response, error) {
@@ -91,26 +99,51 @@ func ExecutePostRequest(context context.Context, url string, reqbody *bytes.Buff
 	}
 	reqPost.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
-	resp, err := client.Do(reqPost)
-
-	if err != nil {
-		return nil, fmt.Errorf("error sending POST request: %w", err)
-	}
-
-	return resp, nil
-}
-
-func CopyRequestBody(body io.ReadCloser) (*bytes.Buffer, error) {
-	LongURL := new(bytes.Buffer)
-	_, err := io.Copy(LongURL, body)
-	if err != nil {
-		return nil, err
-	}
-
-	return LongURL, nil
+	return ExecuteRequest(reqPost, ErrPostRequest)
 }
 
 func MakeURLString(protocol string, host string, path string) string {
 	return protocol + host + path
+}
+
+func WriteErrorResponse(statusCode int, errorResp string, w http.ResponseWriter) {
+	w.WriteHeader(statusCode)
+	w.Write([]byte(errorResp))
+}
+
+type URLType interface {
+	ShortURL | LongURL | URLPair
+}
+
+func ReadURL[urlType URLType](statusCode int, w http.ResponseWriter, req *http.Request) (urlType, error) {
+	var url urlType
+	if err := json.NewDecoder(req.Body).Decode(&url); err != nil {
+		WriteErrorResponse(statusCode, err.Error(), w)
+		return url, err
+	}
+
+	return url, nil
+}
+
+func WriteURL[urlType URLType](urls *urlType, statusCode int, w http.ResponseWriter) {
+	if err := json.NewEncoder(w).Encode(urls); err != nil {
+		WriteErrorResponse(statusCode, err.Error(), w)
+	}
+}
+
+func ReadErrorFromRespBody(body io.ReadCloser) error {
+	bodyBytes, err := io.ReadAll(body)
+
+	if err != nil {
+		return err
+	}
+	return errors.New(string(bodyBytes))
+}
+
+func ReadURLFromResponse[urlType URLType](httpResp *http.Response) (*urlType, error) {
+	var urls urlType
+	if err := json.NewDecoder(httpResp.Body).Decode(&urls); err != nil {
+		return nil, err
+	}
+	return &urls, nil
 }

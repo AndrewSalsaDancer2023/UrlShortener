@@ -2,20 +2,26 @@ package controller
 
 import (
 	"context"
+	"errors"
 
 	"urlshortener.com/gateway/pkg/config"
 	"urlshortener.com/utils"
 )
 
-var DefaultValue = utils.ShortURL{}
+var defaultShortURL = utils.ShortURL{}
+var defaultLongURL = utils.LongURL{}
+
+var errImpossibleCreateShortURL = errors.New(string("impossible to create short url"))
+var errImpossibleCreateLongURL = errors.New(string("impossible to create long url"))
+var errImpossibleCreateURLPair = errors.New(string("impossible to create url pair"))
 
 type engineGateway interface {
-	CreateShortURL(ctx context.Context, url string) (utils.ShortURL, error)
+	CreateShortURL(ctx context.Context, url string) (*utils.ShortURL, error)
 }
 
 type cacheGateway interface {
-	CreatURLPair(ctx context.Context, pair utils.URLPair) (utils.URLPair, error)
-	GetLongURL(ctx context.Context, shortURL string) (utils.ShortURL, error)
+	CreatURLPair(ctx context.Context, pair utils.URLPair) (*utils.URLPair, error)
+	GetLongURL(ctx context.Context, shortURL string) (*utils.LongURL, error)
 }
 
 type Controller struct {
@@ -31,21 +37,35 @@ func (c *Controller) CreateShortURL(ctx context.Context, longURL string) (utils.
 
 	resp, err := c.engineGateway.CreateShortURL(ctx, longURL)
 	if err != nil {
-		return DefaultValue, err
+		return defaultShortURL, err
+	}
+
+	if resp == nil {
+		return defaultShortURL, errImpossibleCreateShortURL
 	}
 
 	pair := utils.URLPair{LongURL: longURL, ShortURL: resp.URL}
 	urls, err := c.cacheGateway.CreatURLPair(ctx, pair)
 	if err != nil {
-		return DefaultValue, err
+		return defaultShortURL, err
 	}
 
+	if urls == nil {
+		return defaultShortURL, errImpossibleCreateURLPair
+	}
 	cfg := config.GetConfig()
 	url := utils.MakeURLString(cfg.ProtocolKey+cfg.DoubleSeparator, cfg.GatewayURL+cfg.OriginalURLPathShort, urls.ShortURL)
 
 	return utils.ShortURL{URL: url}, nil
 }
 
-func (c *Controller) GetOriginalURL(ctx context.Context, shortURL string) (utils.ShortURL, error) {
-	return c.cacheGateway.GetLongURL(ctx, shortURL)
+func (c *Controller) GetOriginalURL(ctx context.Context, shortURL string) (utils.LongURL, error) {
+	url, err := c.cacheGateway.GetLongURL(ctx, shortURL)
+	if err != nil {
+		return defaultLongURL, err
+	}
+	if url == nil {
+		return defaultLongURL, errImpossibleCreateLongURL
+	}
+	return *url, nil
 }
