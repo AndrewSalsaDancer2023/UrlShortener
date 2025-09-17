@@ -1,29 +1,24 @@
 package controller
 
 import (
-	"urlshortener.com/cache/internal/engine"
+	"urlshortener.com/cache"
 	"urlshortener.com/utils"
 )
 
-type StorageController interface {
-	CreateURLValuePair(longURL engine.KeyType, shortVal engine.ValueType) error
-	GetValueForURL(shortenURL engine.ValueType) (engine.KeyType, error)
-}
-
 type CacheController struct {
-	cache *engine.Cache
+	cache cache.Cacher
 }
 
-func New() *CacheController {
-	return &CacheController{engine.New()}
+func New(ch cache.Cacher) *CacheController {
+	return &CacheController{cache: ch}
 }
 
-func (cntrl *CacheController) CreateURLValuePair(longURL engine.KeyType, shortVal engine.ValueType) utils.URLPair {
+func (cntrl *CacheController) CreateURLValuePair(longURL cache.KeyType, shortVal cache.ValueType) utils.URLPair {
 	shortVal = cntrl.cache.AddKeyValue(longURL, shortVal)
 	return utils.URLPair{LongURL: longURL, ShortURL: shortVal}
 }
 
-func (cntrl *CacheController) GetValueForURL(shortenURL engine.ValueType) (engine.KeyType, error) {
+func (cntrl *CacheController) GetValueForURL(shortenURL cache.ValueType) (cache.KeyType, error) {
 
 	return cntrl.cache.GetKeyForValue(shortenURL)
 }

@@ -37,6 +37,5 @@ func (h *Handler) CreateShortURL(w http.ResponseWriter, req *http.Request) {
 	}
 
 	resp := utils.ShortURL{URL: val}
-
 	utils.WriteURL(&resp, http.StatusInternalServerError, w)
 }

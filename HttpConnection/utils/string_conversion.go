@@ -2,34 +2,41 @@ package utils
 
 import (
 	"errors"
-	"math"
 	"strings"
 )
 
+const DefaultValue = ""
 const alphabet = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 const base = 62
 
 var ErrConvertNumber = errors.New("unable convert number to string")
 var ErrConvertString = errors.New("unable convert string to number")
 
+func convertBase62IntToString(reminder uint64) (string, error) {
+	if reminder >= uint64(len(alphabet)) {
+		return "", ErrConvertNumber
+	}
+	return string(alphabet[reminder]), nil
+}
+
 func ToBase62(number uint64) (string, error) {
-	reminder := number % base
-	result := string(alphabet[reminder])
-	div := number / base
-	num := uint64(math.Floor(float64(div)))
-
-	for num != 0 {
-		reminder = num % base
-		temp := num / base
-		num = uint64(math.Floor(float64(temp)))
-
-		if int(reminder) < 0 || int(reminder) >= len(alphabet) {
-			return "", ErrConvertNumber
-		}
-		result = string(alphabet[int(reminder)]) + result
+	if number == 0 {
+		return string(alphabet[number]), nil
 	}
 
-	return string(result), nil
+	var res string = ""
+
+	for number != 0 {
+		reminder := number % base
+		number = number / base
+		val, err := convertBase62IntToString(reminder)
+		if err != nil {
+			return DefaultValue, err
+		}
+		res = val + res
+	}
+
+	return res, nil
 }
 
 func ToBase10(str string) (uint64, error) {

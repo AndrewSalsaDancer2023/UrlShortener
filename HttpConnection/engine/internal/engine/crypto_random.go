@@ -7,6 +7,13 @@ import (
 
 const upperValue int64 = 3500000000000
 
+type ValueGenerator struct {
+}
+
+func New() *ValueGenerator {
+	return &ValueGenerator{}
+}
+
 func generateRandom(upperLimit int64) (uint64, error) {
 	maxValue := big.NewInt(upperLimit)
 	randomNumber, err := rand.Int(rand.Reader, maxValue)
@@ -16,6 +23,6 @@ func generateRandom(upperLimit int64) (uint64, error) {
 	return randomNumber.Uint64(), nil
 }
 
-func GenerateRandomValue() (uint64, error) {
+func (gen *ValueGenerator) GenerateRandomValue() (uint64, error) {
 	return generateRandom(upperValue)
 }

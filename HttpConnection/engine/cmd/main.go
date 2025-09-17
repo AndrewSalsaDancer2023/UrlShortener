@@ -6,12 +6,14 @@ import (
 	"time"
 
 	"urlshortener.com/engine/internal/controller"
+	crypto_engine "urlshortener.com/engine/internal/engine"
 	httphandler "urlshortener.com/engine/internal/handler"
 	"urlshortener.com/gateway/pkg/config"
 )
 
 func main() {
-	ctrl := controller.New()
+	gen := crypto_engine.New()
+	ctrl := controller.New(gen)
 	h := httphandler.New(ctrl)
 	cfg := config.GetConfig()
 	log.Println("Starting short url creation generation service:  " + cfg.EngineURL)
