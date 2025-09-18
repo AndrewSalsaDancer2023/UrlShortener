@@ -59,7 +59,7 @@ func (c *Controller) CreateShortURL(ctx context.Context, longURL string) (utils.
 	return utils.ShortURL{URL: url}, nil
 }
 
-func (c *Controller) GetOriginalURL(ctx context.Context, shortURL string) (utils.LongURL, error) {
+func (c *Controller) GetLongURL(ctx context.Context, shortURL string) (utils.LongURL, error) {
 	url, err := c.cacheGateway.GetLongURL(ctx, shortURL)
 	if err != nil {
 		return defaultLongURL, err

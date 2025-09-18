@@ -31,7 +31,7 @@ func (h *Handler) SetupRouter() *mux.Router {
 
 	log.Println("Setup POST handler on: " + cfg.ShortURLPath)
 
-	router.HandleFunc(cfg.OriginalURLPath, h.GetOriginalURL).Methods("GET")
+	router.HandleFunc(cfg.OriginalURLPath, h.GetLongURL).Methods("GET")
 	router.HandleFunc(cfg.ShortURLPath, h.CreateShortURL).Methods("POST")
 
 	return router
@@ -55,7 +55,7 @@ func (h *Handler) CreateShortURL(w http.ResponseWriter, r *http.Request) {
 	utils.WriteURL(&shortURL, http.StatusInternalServerError, w)
 }
 
-func (h *Handler) GetOriginalURL(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetLongURL(w http.ResponseWriter, r *http.Request) {
 
 	vars := mux.Vars(r)
 	_, ok := vars["shorted_url"]
@@ -67,7 +67,7 @@ func (h *Handler) GetOriginalURL(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 	defer cancel()
 
-	url, err := h.ctrl.GetOriginalURL(ctx, r.URL.Path)
+	url, err := h.ctrl.GetLongURL(ctx, r.URL.Path)
 	if err != nil {
 		utils.WriteErrorResponse(http.StatusNotFound, err.Error(), w)
 		return
