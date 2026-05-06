@@ -35,7 +35,7 @@ func main() {
 			),
 		),
 	)
-
+	// http://localhost:8080/api/v1/generate
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,
 		Handler:      chain,

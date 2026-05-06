@@ -9,7 +9,6 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
-
 	"urlshortener/config"
 	"urlshortener/internal/base62"
 	"urlshortener/internal/eventbus"
@@ -29,7 +28,7 @@ func main() {
 
 	// 3. Низкоуровневые зависимости
 	gen, err := generator.New(generator.Config{
-		Epoch:        cfg.Epoch,
+		//		Epoch:        cfg.Epoch,
 		DatacenterID: cfg.DatacenterID,
 		MachineID:    cfg.MachineID,
 	})

@@ -14,15 +14,15 @@ type Config struct {
 	// Snowflake generator
 	DatacenterID int64
 	MachineID    int64
-	Epoch        int64 // Unix ms; 0 = TwitterEpoch
+	// Epoch        int64 // Unix ms; 0 = TwitterEpoch
 }
 
 func Load() Config {
 	return Config{
 		Port:         getEnv("PORT", "8080"),
-		DatacenterID: getEnvInt64("DATACENTER_ID", 1),
-		MachineID:    getEnvInt64("MACHINE_ID", 1),
-		Epoch:        getEnvInt64("EPOCH", 0),
+		DatacenterID: getEnvInt64("DATACENTER_ID", 0),
+		MachineID:    getEnvInt64("MACHINE_ID", 0),
+		//		Epoch:        getEnvInt64("EPOCH", 0),
 	}
 }
 

@@ -12,7 +12,7 @@ import (
 
 func newGen(t *testing.T) *generator.Generator {
 	t.Helper()
-	g, err := generator.New(generator.Config{DatacenterID: 1, MachineID: 1})
+	g, err := generator.New(generator.Config{DatacenterID: 0, MachineID: 0})
 	require.NoError(t, err)
 	return g
 }
@@ -23,7 +23,7 @@ func TestNew_ValidConfig(t *testing.T) {
 	cases := []generator.Config{
 		{DatacenterID: 0, MachineID: 0},
 		{DatacenterID: generator.MaxDatacenterID, MachineID: generator.MaxMachineID},
-		{DatacenterID: 1, MachineID: 1, Epoch: 1_700_000_000_000},
+		{DatacenterID: 1, MachineID: 1},
 	}
 	for _, cfg := range cases {
 		g, err := generator.New(cfg)

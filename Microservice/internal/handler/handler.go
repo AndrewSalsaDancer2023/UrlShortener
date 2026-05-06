@@ -120,7 +120,7 @@ func (h *IDHandler) NewRouter() *mux.Router {
 
 	// Версионированный API-префикс
 	api := r.PathPrefix("/api/v1").Subrouter()
-	api.HandleFunc("/generate", h.Generate).Methods(http.MethodPost)
+	api.HandleFunc("/generate", h.Generate).Methods(http.MethodGet)
 
 	// Служебные маршруты
 	r.HandleFunc("/health", h.Health).Methods(http.MethodGet)

@@ -83,7 +83,7 @@ func (g *Generator) NextID() (int64, error) {
 		g.sequence = (g.sequence + 1) & MaxSequence
 		if g.sequence == 0 {
 			// Исчерпали последовательность — ждём следующей миллисекунды
-			now = g.waitNextMillis(g.lastTimestamp)
+			now = g.waitNextSecond(g.lastTimestamp)
 		}
 	} else {
 		g.sequence = 0
@@ -127,8 +127,8 @@ func (g *Generator) currentMillis() int64 {
 	return time.Now().UnixMilli()
 }
 
-// waitNextMillis ждёт, пока системное время не превысит lastTimestamp.
-func (g *Generator) waitNextMillis(last int64) int64 {
+// waitNextSecond ждёт, пока системное время не превысит lastTimestamp.
+func (g *Generator) waitNextSecond(last int64) int64 {
 	now := g.currentMillis()
 	for now <= last {
 		now = g.currentMillis()
