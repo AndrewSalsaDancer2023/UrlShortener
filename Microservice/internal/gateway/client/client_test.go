@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"urlshortener/internal/gateway/client"
+	client "urlshortener/internal/gateway/client/http"
 )
 
 // newFakeUpstream поднимает тестовый HTTP-сервер, имитирующий микросервис генерации ID.
@@ -35,7 +35,7 @@ func TestGenerate_Success(t *testing.T) {
 		})
 	})
 
-	c := client.New(srv.URL, 5*time.Second)
+	c, _ := client.New(srv.URL, 5*time.Second)
 	resp, err := c.Generate(context.Background())
 
 	require.NoError(t, err)
@@ -51,7 +51,7 @@ func TestGenerate_UsesPostMethod(t *testing.T) {
 		_ = json.NewEncoder(w).Encode(map[string]any{"numeric_id": 1, "short_code": "1"})
 	})
 
-	c := client.New(srv.URL, 5*time.Second)
+	c, _ := client.New(srv.URL, 5*time.Second)
 	_, err := c.Generate(context.Background())
 
 	require.NoError(t, err)
@@ -66,7 +66,7 @@ func TestGenerate_HitsCorrectPath(t *testing.T) {
 		_ = json.NewEncoder(w).Encode(map[string]any{"numeric_id": 1, "short_code": "1"})
 	})
 
-	c := client.New(srv.URL, 5*time.Second)
+	c, _ := client.New(srv.URL, 5*time.Second)
 	_, err := c.Generate(context.Background())
 
 	require.NoError(t, err)
@@ -78,7 +78,7 @@ func TestGenerate_Upstream500_ReturnsError(t *testing.T) {
 		w.WriteHeader(http.StatusInternalServerError)
 	})
 
-	c := client.New(srv.URL, 5*time.Second)
+	c, _ := client.New(srv.URL, 5*time.Second)
 	_, err := c.Generate(context.Background())
 
 	assert.Error(t, err)
@@ -90,7 +90,7 @@ func TestGenerate_Upstream404_ReturnsError(t *testing.T) {
 		w.WriteHeader(http.StatusNotFound)
 	})
 
-	c := client.New(srv.URL, 5*time.Second)
+	c, _ := client.New(srv.URL, 5*time.Second)
 	_, err := c.Generate(context.Background())
 
 	assert.Error(t, err)
@@ -101,7 +101,7 @@ func TestGenerate_InvalidJSON_ReturnsError(t *testing.T) {
 		_, _ = w.Write([]byte("not json"))
 	})
 
-	c := client.New(srv.URL, 5*time.Second)
+	c, _ := client.New(srv.URL, 5*time.Second)
 	_, err := c.Generate(context.Background())
 
 	assert.Error(t, err)
@@ -114,7 +114,7 @@ func TestGenerate_Timeout_ReturnsError(t *testing.T) {
 		time.Sleep(200 * time.Millisecond)
 	})
 
-	c := client.New(srv.URL, 50*time.Millisecond)
+	c, _ := client.New(srv.URL, 50*time.Millisecond)
 	_, err := c.Generate(context.Background())
 
 	assert.Error(t, err, "must return error on timeout")
@@ -128,14 +128,14 @@ func TestGenerate_ContextCancelled_ReturnsError(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // отменяем контекст сразу
 
-	c := client.New(srv.URL, 5*time.Second)
+	c, _ := client.New(srv.URL, 5*time.Second)
 	_, err := c.Generate(ctx)
 
 	assert.Error(t, err)
 }
 
 func TestGenerate_UnreachableHost_ReturnsError(t *testing.T) {
-	c := client.New("http://127.0.0.1:1", 100*time.Millisecond)
+	c, _ := client.New("http://127.0.0.1:1", 100*time.Millisecond)
 	_, err := c.Generate(context.Background())
 	assert.Error(t, err)
 }

@@ -11,8 +11,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"urlshortener/internal/gateway/client"
+	//	client "urlshortener/internal/gateway/client/http"
 	"urlshortener/internal/gateway/handler"
+	client "urlshortener/internal/gateway/handler/domain"
 )
 
 // --- мок клиента ---

@@ -1,11 +1,9 @@
-package service
+package grpcservice
 
 import (
 	"fmt"
-	"time"
 
 	"urlshortener/internal/base62"
-	"urlshortener/internal/eventbus"
 	"urlshortener/internal/generator"
 )
 
@@ -20,15 +18,13 @@ type GenerateResult struct {
 type IDService struct {
 	gen     generator.IDGenerator
 	encoder base62.Encoder
-	bus     *eventbus.Bus
 }
 
 // New создаёт IDService с внедрёнными зависимостями.
-func New(gen generator.IDGenerator, encoder base62.Encoder, bus *eventbus.Bus) *IDService {
+func New(gen generator.IDGenerator, encoder base62.Encoder /*, bus *eventbus.Bus*/) *IDService {
 	return &IDService{
 		gen:     gen,
 		encoder: encoder,
-		bus:     bus,
 	}
 }
 
@@ -36,19 +32,11 @@ func New(gen generator.IDGenerator, encoder base62.Encoder, bus *eventbus.Bus) *
 func (s *IDService) Generate() (*GenerateResult, error) {
 	id, err := s.gen.NextID()
 	if err != nil {
-		s.bus.PublishIDError(eventbus.IDErrorEvent{
-			Err:       fmt.Errorf("generator.NextID: %w", err),
-			Timestamp: time.Now(),
-		})
 		return nil, fmt.Errorf("failed to generate id: %w", err)
 	}
 
 	short, err := s.encoder.Encode(id)
 	if err != nil {
-		s.bus.PublishIDError(eventbus.IDErrorEvent{
-			Err:       fmt.Errorf("encoder.Encode: %w", err),
-			Timestamp: time.Now(),
-		})
 		return nil, fmt.Errorf("failed to encode id: %w", err)
 	}
 
@@ -56,12 +44,12 @@ func (s *IDService) Generate() (*GenerateResult, error) {
 		NumericID: id,
 		ShortCode: short,
 	}
-
-	s.bus.PublishIDGenerated(eventbus.IDGeneratedEvent{
-		NumericID: id,
-		ShortCode: short,
-		Timestamp: time.Now(),
-	})
-
+	/*
+		s.bus.PublishIDGenerated(eventbus.IDGeneratedEvent{
+			NumericID: id,
+			ShortCode: short,
+			Timestamp: time.Now(),
+		})
+	*/
 	return result, nil
 }

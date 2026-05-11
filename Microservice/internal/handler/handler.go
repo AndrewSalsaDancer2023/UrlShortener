@@ -100,7 +100,7 @@ import (
 
 	"github.com/gorilla/mux"
 
-	"urlshortener/internal/service"
+	service "urlshortener/internal/idgenservice"
 )
 
 // IDHandler обрабатывает HTTP-запросы генерации ID.

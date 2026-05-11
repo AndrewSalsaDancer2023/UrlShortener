@@ -1,6 +1,7 @@
 package config
 
 import (
+	"flag"
 	"os"
 	"strconv"
 )
@@ -18,11 +19,25 @@ type Config struct {
 }
 
 func Load() Config {
+
+	portFlag := flag.String("port", getEnv("PORT", "50051"), "gRPC server port")
+	dcFlag := flag.Int64("dc-id", getEnvInt64("DATACENTER_ID", 0), "Datacenter ID")
+	machFlag := flag.Int64("mach-id", getEnvInt64("MACHINE_ID", 0), "Machine ID")
+
+	// 2. Парсим переданные аргументы командной строки.
+	// Эта функция перезапишет дефолтные значения, если флаги были переданы вручную.
+	flag.Parse()
+	/*
+		return Config{
+			Port:         getEnv("PORT", ":50051"),
+			DatacenterID: getEnvInt64("DATACENTER_ID", 0),
+			MachineID:    getEnvInt64("MACHINE_ID", 0),
+		}
+	*/
 	return Config{
-		Port:         getEnv("PORT", "8080"),
-		DatacenterID: getEnvInt64("DATACENTER_ID", 0),
-		MachineID:    getEnvInt64("MACHINE_ID", 0),
-		//		Epoch:        getEnvInt64("EPOCH", 0),
+		Port:         *portFlag,
+		DatacenterID: *dcFlag,
+		MachineID:    *machFlag,
 	}
 }
 

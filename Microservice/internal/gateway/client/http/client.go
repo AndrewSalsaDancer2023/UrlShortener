@@ -6,13 +6,14 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+	"urlshortener/internal/gateway/handler/domain"
 )
 
 // GenerateResponse — ответ микросервиса генерации ID.
-type GenerateResponse struct {
-	NumericID int64  `json:"numeric_id"`
-	ShortCode string `json:"short_code"`
-}
+// type GenerateResponse struct {
+// 	NumericID int64  `json:"numeric_id"`
+// 	ShortCode string `json:"short_code"`
+// }
 
 // IDServiceClient — HTTP-клиент к микросервису генерации ID.
 // Инкапсулирует всю логику общения с upstream:
@@ -23,7 +24,7 @@ type IDServiceClient struct {
 }
 
 // New создаёт клиент с заданным адресом upstream и таймаутом.
-func New(baseURL string, timeout time.Duration) *IDServiceClient {
+func New(baseURL string, timeout time.Duration) (*IDServiceClient, error) {
 	return &IDServiceClient{
 		baseURL: baseURL,
 		httpClient: &http.Client{
@@ -35,11 +36,15 @@ func New(baseURL string, timeout time.Duration) *IDServiceClient {
 				IdleConnTimeout:     90 * time.Second,
 			},
 		},
-	}
+	}, nil
+}
+
+func (c *IDServiceClient) Close() error {
+	return nil
 }
 
 // Generate вызывает POST /api/v1/generate на upstream и возвращает результат.
-func (c *IDServiceClient) Generate(ctx context.Context) (*GenerateResponse, error) {
+func (c *IDServiceClient) Generate(ctx context.Context) (*domain.GenerateResponse, error) {
 	url := c.baseURL + "/api/v1/generate"
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, nil)
@@ -58,7 +63,7 @@ func (c *IDServiceClient) Generate(ctx context.Context) (*GenerateResponse, erro
 		return nil, fmt.Errorf("upstream returned non-200 status: %d", resp.StatusCode)
 	}
 
-	var result GenerateResponse
+	var result domain.GenerateResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, fmt.Errorf("decode response: %w", err)
 	}

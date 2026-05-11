@@ -28,7 +28,7 @@ type GatewayConfig struct {
 func LoadGateway() GatewayConfig {
 	return GatewayConfig{
 		Port:            getEnv("GATEWAY_PORT", "9090"),
-		IDServiceURL:    getEnv("ID_SERVICE_URL", "http://localhost:8080"),
+		IDServiceURL:    getEnv("ID_SERVICE_URL", "localhost:50051"),
 		UpstreamTimeout: getEnvDuration("UPSTREAM_TIMEOUT", 5*time.Second),
 		RateLimitRPS:    getEnvInt("RATE_LIMIT_RPS", 10),
 		RateLimitBurst:  getEnvInt("RATE_LIMIT_BURST", 20),

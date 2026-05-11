@@ -11,10 +11,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"urlshortener/internal/base62"
-	"urlshortener/internal/eventbus"
 	"urlshortener/internal/generator"
 	"urlshortener/internal/handler"
-	"urlshortener/internal/service"
+	service "urlshortener/internal/idgenservice"
 )
 
 // --- моки ---
@@ -41,8 +40,7 @@ func newRouter(t *testing.T) http.Handler {
 	t.Helper()
 	gen, err := generator.New(generator.Config{DatacenterID: 1, MachineID: 1})
 	require.NoError(t, err)
-	bus := eventbus.New()
-	svc := service.New(gen, base62.New(), bus)
+	svc := service.New(gen, base62.New())
 	h := handler.New(svc)
 	return h.NewRouter()
 }
@@ -50,8 +48,7 @@ func newRouter(t *testing.T) http.Handler {
 // newRouterWithMocks собирает роутер с подменёнными зависимостями.
 func newRouterWithMocks(t *testing.T, gen *mockGenerator, enc *mockEncoder) http.Handler {
 	t.Helper()
-	bus := eventbus.New()
-	svc := service.New(gen, enc, bus)
+	svc := service.New(gen, enc)
 	h := handler.New(svc)
 	return h.NewRouter()
 }

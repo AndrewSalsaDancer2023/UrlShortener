@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"urlshortener/config"
-	"urlshortener/internal/gateway/client"
+	grpclient "urlshortener/internal/gateway/client/grpc"
 	gatewayhandler "urlshortener/internal/gateway/handler"
 	gatewaymiddleware "urlshortener/internal/gateway/middleware"
 )
@@ -20,8 +20,11 @@ func main() {
 	cfg := config.LoadGateway()
 
 	// Клиент к микросервису генерации ID
-	idClient := client.New(cfg.IDServiceURL, cfg.UpstreamTimeout)
-
+	//idClient := client.New(cfg.IDServiceURL, cfg.UpstreamTimeout)
+	idClient, err := grpclient.New(cfg.IDServiceURL, cfg.UpstreamTimeout)
+	if err != nil {
+		log.Fatalf("client creation error: %v", err)
+	}
 	// Роутер
 	h := gatewayhandler.New(idClient)
 	router := h.NewRouter()
@@ -65,3 +68,12 @@ func main() {
 	}
 	log.Println("[GATEWAY] stopped")
 }
+
+/*
+curl -X POST http://localhost:9090/api/v1/data/shorten \
+     -H "Content-Type: application/json" \
+     -d '{"longUrl":"https://www.someurl.com"}'
+
+curl -X GET http://localhost:9090/api/v1/short/qwert12 \
+     -H "Content-Type: application/json"
+*/
