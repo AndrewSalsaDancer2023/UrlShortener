@@ -22,6 +22,11 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	"urlshortener/utils"
+
+	"google.golang.org/grpc/health"
+	healthgrpc "google.golang.org/grpc/health/grpc_health_v1"
 )
 
 func main() {
@@ -44,24 +49,20 @@ func main() {
 
 	svc := service.New(gen, encoder /*, bus*/)
 	// Настройка Logger Interceptor (адаптируем стандартный логгер Go под gRPC)
+	logFileName := "grpc_server" + cfg.Port + ".log"
+	logFile, err := os.OpenFile(logFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		log.Fatalf("Не удалось открыть файл логов %s: %v", logFileName, err)
+	}
+	// Обязательно закрываем файл при завершении работы всего приложения
+	defer logFile.Close()
+	log.SetOutput(logFile)
+
 	loggerOpts := []logging.Option{
 		logging.WithLogOnEvents(logging.StartCall, logging.FinishCall),
 	}
 	grpcLogger := logging.LoggerFunc(func(ctx context.Context, lvl logging.Level, msg string, fields ...any) {
-		var levelStr string
-		switch lvl {
-		case logging.LevelDebug:
-			levelStr = "DEBUG"
-		case logging.LevelInfo:
-			levelStr = "INFO"
-		case logging.LevelWarn:
-			levelStr = "WARN"
-		case logging.LevelError:
-			levelStr = "ERROR"
-		default:
-			levelStr = "UNKNOWN"
-		}
-		log.Printf("[%s] %s %v", levelStr, msg, fields)
+		log.Printf("[%s] %s %v", utils.CreateDebugLevelString(lvl), msg, fields)
 	})
 
 	//4. Настройка Recover Interceptor (перехват panic)
@@ -85,13 +86,26 @@ func main() {
 	grpcHandler := handler.New(svc)
 	pb.RegisterIDServiceServer(gRPCServer, grpcHandler)
 
-	//7. gRPC работает поверх чистого TCP соединения, открываем порт
+	// 7. Создаем health сервер и регистрируем наш gRPCServer
+	//в качестве наблюдаемого
+	healthServer := health.NewServer()
+	// Устанавливаем статус SERVING
+	healthServer.SetServingStatus(
+		"",
+		healthgrpc.HealthCheckResponse_SERVING,
+	)
+	healthgrpc.RegisterHealthServer(
+		gRPCServer,
+		healthServer,
+	)
+
+	//8. gRPC работает поверх чистого TCP соединения, открываем порт
 	lis, err := net.Listen("tcp", ":"+cfg.Port)
 	if err != nil {
 		log.Fatalf("failed to listen port %s: %v", cfg.Port, err)
 	}
 
-	// 8. Graceful shutdown
+	// 9. Graceful shutdown
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 
@@ -114,3 +128,5 @@ func main() {
 }
 
 //grpcurl -plaintext -import-path ./internal/proto -proto idservice.proto -d '{}' localhost:50051  generator.IDService.GetNextID
+
+//go run ./cmd/idgenservice/ --port=50051

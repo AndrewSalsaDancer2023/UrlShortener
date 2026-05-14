@@ -12,19 +12,45 @@ import (
 
 	"urlshortener/config"
 	grpclient "urlshortener/internal/gateway/client/grpc"
+
+	//	client "urlshortener/internal/gateway/client/http"
 	gatewayhandler "urlshortener/internal/gateway/handler"
 	gatewaymiddleware "urlshortener/internal/gateway/middleware"
-)
+	/*
+	   "google.golang.org/grpc"
+	   "google.golang.org/grpc/credentials/insecure"
+	   "google.golang.org/grpc/resolver"
+	   "google.golang.org/grpc/resolver/manual"
+	*/)
 
 func main() {
 	cfg := config.LoadGateway()
 
+	/////////////////////////////////////////////////////////////////
+	// 1. Список адресов ваших генераторов (задаются при старте)
+	serverAddrs := "ipv4:///127.0.0.1:50051,127.0.0.1:50052"
+
+	// serverAddrs := "dns:///localhost:50051,localhost:50052,localhost:50053"
+	serviceConfig := `{
+            "loadBalancingConfig": [
+                    {
+                        "round_robin": {}
+                    }
+                ],
+            "healthCheckConfig": {
+                    "serviceName": ""
+            }
+    }`
+
+	/////////////////////////////////////////////////////////////////
 	// Клиент к микросервису генерации ID
-	//idClient := client.New(cfg.IDServiceURL, cfg.UpstreamTimeout)
-	idClient, err := grpclient.New(cfg.IDServiceURL, cfg.UpstreamTimeout)
+	//idClient, err := grpclient.New(cfg.IDServiceURL, cfg.UpstreamTimeout)
+	//rslv := grpclient.CreateResolver("generator")
+	idClient, err := grpclient.NewClient(serverAddrs, serviceConfig)
 	if err != nil {
 		log.Fatalf("client creation error: %v", err)
 	}
+	defer idClient.Close()
 	// Роутер
 	h := gatewayhandler.New(idClient)
 	router := h.NewRouter()
@@ -38,7 +64,7 @@ func main() {
 			),
 		),
 	)
-	// http://localhost:8080/api/v1/generate
+
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,
 		Handler:      chain,
@@ -59,7 +85,7 @@ func main() {
 
 	<-stop
 	log.Println("[GATEWAY] shutting down...")
-
+	// idClient.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
