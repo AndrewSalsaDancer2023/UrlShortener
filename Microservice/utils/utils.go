@@ -1,6 +1,18 @@
 package utils
 
-import "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"strings"
+
+	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
+)
+
+const (
+	ConfigPath         = "data/balance_config.json"
+	GateWayLogFileName = "gateway.log"
+)
 
 func CreateDebugLevelString(lvl logging.Level) string {
 	switch lvl {
@@ -15,6 +27,23 @@ func CreateDebugLevelString(lvl logging.Level) string {
 	default:
 		return "UNKNOWN"
 	}
+}
+
+func ReadJSONFile(filePath string) (string, error) {
+	//1. Читаем файл с диска
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return "", err
+	}
+
+	// 2. Превращаем байты в строку и убираем лишние пробелы/переносы строк
+	line := strings.TrimSpace(string(data))
+
+	// 3. Проверяем, является ли строка валидным JSON
+	if json.Valid([]byte(line)) == false {
+		return "", fmt.Errorf("invalid JSON file: %s", filePath)
+	}
+	return line, nil
 }
 
 /*var levelStr string

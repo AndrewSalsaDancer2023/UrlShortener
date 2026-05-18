@@ -2,9 +2,9 @@
 // versions:
 // 	protoc-gen-go v1.36.11
 // 	protoc        v3.6.1
-// source: internal/proto/idservice.proto
+// source: proto/idservice.proto
 
-package proto
+package idservice
 
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
@@ -29,7 +29,7 @@ type IDRequest struct {
 
 func (x *IDRequest) Reset() {
 	*x = IDRequest{}
-	mi := &file_internal_proto_idservice_proto_msgTypes[0]
+	mi := &file_proto_idservice_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -41,7 +41,7 @@ func (x *IDRequest) String() string {
 func (*IDRequest) ProtoMessage() {}
 
 func (x *IDRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_proto_idservice_proto_msgTypes[0]
+	mi := &file_proto_idservice_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -54,7 +54,7 @@ func (x *IDRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IDRequest.ProtoReflect.Descriptor instead.
 func (*IDRequest) Descriptor() ([]byte, []int) {
-	return file_internal_proto_idservice_proto_rawDescGZIP(), []int{0}
+	return file_proto_idservice_proto_rawDescGZIP(), []int{0}
 }
 
 type IDResponse struct {
@@ -67,7 +67,7 @@ type IDResponse struct {
 
 func (x *IDResponse) Reset() {
 	*x = IDResponse{}
-	mi := &file_internal_proto_idservice_proto_msgTypes[1]
+	mi := &file_proto_idservice_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -79,7 +79,7 @@ func (x *IDResponse) String() string {
 func (*IDResponse) ProtoMessage() {}
 
 func (x *IDResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_proto_idservice_proto_msgTypes[1]
+	mi := &file_proto_idservice_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -92,7 +92,7 @@ func (x *IDResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IDResponse.ProtoReflect.Descriptor instead.
 func (*IDResponse) Descriptor() ([]byte, []int) {
-	return file_internal_proto_idservice_proto_rawDescGZIP(), []int{1}
+	return file_proto_idservice_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *IDResponse) GetId() int64 {
@@ -109,37 +109,37 @@ func (x *IDResponse) GetCode() string {
 	return ""
 }
 
-var File_internal_proto_idservice_proto protoreflect.FileDescriptor
+var File_proto_idservice_proto protoreflect.FileDescriptor
 
-const file_internal_proto_idservice_proto_rawDesc = "" +
+const file_proto_idservice_proto_rawDesc = "" +
 	"\n" +
-	"\x1einternal/proto/idservice.proto\x12\tgenerator\"\v\n" +
+	"\x15proto/idservice.proto\x12\tgenerator\"\v\n" +
 	"\tIDRequest\"0\n" +
 	"\n" +
 	"IDResponse\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x03R\x02id\x12\x12\n" +
 	"\x04code\x18\x02 \x01(\tR\x04code2E\n" +
 	"\tIDService\x128\n" +
-	"\tGetNextID\x12\x14.generator.IDRequest\x1a\x15.generator.IDResponseB\tZ\a./protob\x06proto3"
+	"\tGetNextID\x12\x14.generator.IDRequest\x1a\x15.generator.IDResponseB\x13Z\x11./proto/idserviceb\x06proto3"
 
 var (
-	file_internal_proto_idservice_proto_rawDescOnce sync.Once
-	file_internal_proto_idservice_proto_rawDescData []byte
+	file_proto_idservice_proto_rawDescOnce sync.Once
+	file_proto_idservice_proto_rawDescData []byte
 )
 
-func file_internal_proto_idservice_proto_rawDescGZIP() []byte {
-	file_internal_proto_idservice_proto_rawDescOnce.Do(func() {
-		file_internal_proto_idservice_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_internal_proto_idservice_proto_rawDesc), len(file_internal_proto_idservice_proto_rawDesc)))
+func file_proto_idservice_proto_rawDescGZIP() []byte {
+	file_proto_idservice_proto_rawDescOnce.Do(func() {
+		file_proto_idservice_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_proto_idservice_proto_rawDesc), len(file_proto_idservice_proto_rawDesc)))
 	})
-	return file_internal_proto_idservice_proto_rawDescData
+	return file_proto_idservice_proto_rawDescData
 }
 
-var file_internal_proto_idservice_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
-var file_internal_proto_idservice_proto_goTypes = []any{
+var file_proto_idservice_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_proto_idservice_proto_goTypes = []any{
 	(*IDRequest)(nil),  // 0: generator.IDRequest
 	(*IDResponse)(nil), // 1: generator.IDResponse
 }
-var file_internal_proto_idservice_proto_depIdxs = []int32{
+var file_proto_idservice_proto_depIdxs = []int32{
 	0, // 0: generator.IDService.GetNextID:input_type -> generator.IDRequest
 	1, // 1: generator.IDService.GetNextID:output_type -> generator.IDResponse
 	1, // [1:2] is the sub-list for method output_type
@@ -149,26 +149,26 @@ var file_internal_proto_idservice_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for field type_name
 }
 
-func init() { file_internal_proto_idservice_proto_init() }
-func file_internal_proto_idservice_proto_init() {
-	if File_internal_proto_idservice_proto != nil {
+func init() { file_proto_idservice_proto_init() }
+func file_proto_idservice_proto_init() {
+	if File_proto_idservice_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_proto_idservice_proto_rawDesc), len(file_internal_proto_idservice_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_idservice_proto_rawDesc), len(file_proto_idservice_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   2,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_internal_proto_idservice_proto_goTypes,
-		DependencyIndexes: file_internal_proto_idservice_proto_depIdxs,
-		MessageInfos:      file_internal_proto_idservice_proto_msgTypes,
+		GoTypes:           file_proto_idservice_proto_goTypes,
+		DependencyIndexes: file_proto_idservice_proto_depIdxs,
+		MessageInfos:      file_proto_idservice_proto_msgTypes,
 	}.Build()
-	File_internal_proto_idservice_proto = out.File
-	file_internal_proto_idservice_proto_goTypes = nil
-	file_internal_proto_idservice_proto_depIdxs = nil
+	File_proto_idservice_proto = out.File
+	file_proto_idservice_proto_goTypes = nil
+	file_proto_idservice_proto_depIdxs = nil
 }

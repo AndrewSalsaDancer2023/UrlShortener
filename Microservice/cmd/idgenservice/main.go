@@ -15,7 +15,7 @@ import (
 
 	service "urlshortener/internal/idgenservice"
 	"urlshortener/internal/idgenservice/handler"
-	pb "urlshortener/internal/proto"
+	pb "urlshortener/internal/proto/idservice"
 
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/recovery"

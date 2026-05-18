@@ -12,6 +12,7 @@ import (
 
 	"urlshortener/config"
 	grpclient "urlshortener/internal/gateway/client/grpc"
+	"urlshortener/utils"
 
 	//	client "urlshortener/internal/gateway/client/http"
 	gatewayhandler "urlshortener/internal/gateway/handler"
@@ -29,23 +30,31 @@ func main() {
 	/////////////////////////////////////////////////////////////////
 	// 1. Список адресов ваших генераторов (задаются при старте)
 	serverAddrs := "ipv4:///127.0.0.1:50051,127.0.0.1:50052"
+	/*
+	   	serviceConfig := `{
+	               "loadBalancingConfig": [
+	                       {
+	                           "round_robin": {}
+	                       }
+	                   ],
+	               "healthCheckConfig": {
+	                       "serviceName": ""
+	               }
+	       }` */
 
-	// serverAddrs := "dns:///localhost:50051,localhost:50052,localhost:50053"
-	serviceConfig := `{
-            "loadBalancingConfig": [
-                    {
-                        "round_robin": {}
-                    }
-                ],
-            "healthCheckConfig": {
-                    "serviceName": ""
-            }
-    }`
+	serviceConfig, err := utils.ReadJSONFile(utils.ConfigPath)
+	if err != nil {
+		log.Fatalf("failed to open balance config: %s: %v", utils.ConfigPath, err)
+	}
 
+	logFile, err := os.OpenFile(utils.GateWayLogFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		log.Fatalf("failed to open log file %s: %v", utils.GateWayLogFileName, err)
+	}
+	defer logFile.Close()
+	log.SetOutput(logFile)
 	/////////////////////////////////////////////////////////////////
 	// Клиент к микросервису генерации ID
-	//idClient, err := grpclient.New(cfg.IDServiceURL, cfg.UpstreamTimeout)
-	//rslv := grpclient.CreateResolver("generator")
 	idClient, err := grpclient.NewClient(serverAddrs, serviceConfig)
 	if err != nil {
 		log.Fatalf("client creation error: %v", err)

@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	service "urlshortener/internal/idgenservice"
-	pb "urlshortener/internal/proto"
+	pb "urlshortener/internal/proto/idservice"
 )
 
 type GRPCHandler struct {

@@ -1,9 +1,8 @@
 package config
 
 import (
-	"os"
-	"strconv"
 	"time"
+	"urlshortener/internal/dbstorage/config"
 )
 
 // GatewayConfig содержит параметры API Gateway.
@@ -27,36 +26,10 @@ type GatewayConfig struct {
 
 func LoadGateway() GatewayConfig {
 	return GatewayConfig{
-		Port:            getEnv("GATEWAY_PORT", "9090"),
-		IDServiceURL:    getEnv("ID_SERVICE_URL", "localhost:50051"),
-		UpstreamTimeout: getEnvDuration("UPSTREAM_TIMEOUT", 5*time.Second),
-		RateLimitRPS:    getEnvInt("RATE_LIMIT_RPS", 10),
-		RateLimitBurst:  getEnvInt("RATE_LIMIT_BURST", 20),
+		Port:            config.GetEnv("GATEWAY_PORT", "9090"),
+		IDServiceURL:    config.GetEnv("ID_SERVICE_URL", "localhost:50051"),
+		UpstreamTimeout: config.GetEnvDuration("UPSTREAM_TIMEOUT", 5*time.Second),
+		RateLimitRPS:    config.GetEnvInt("RATE_LIMIT_RPS", 10),
+		RateLimitBurst:  config.GetEnvInt("RATE_LIMIT_BURST", 20),
 	}
-}
-
-/*
-	func getEnv(key, def string) string {
-		if v := os.Getenv(key); v != "" {
-			return v
-		}
-		return def
-	}
-*/
-func getEnvInt(key string, def int) int {
-	if v := os.Getenv(key); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			return n
-		}
-	}
-	return def
-}
-
-func getEnvDuration(key string, def time.Duration) time.Duration {
-	if v := os.Getenv(key); v != "" {
-		if d, err := time.ParseDuration(v); err == nil {
-			return d
-		}
-	}
-	return def
 }

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 	"urlshortener/internal/gateway/handler/domain"
-	pb "urlshortener/internal/proto"
+	pb "urlshortener/internal/proto/idservice"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -19,6 +19,7 @@ type GRPCIDServiceClient struct {
 	baseURL string
 	client  pb.IDServiceClient
 	conn    *grpc.ClientConn
+	rslv    *manual.Resolver
 }
 
 func CreateResolver(scheme string) *manual.Resolver {
@@ -54,9 +55,11 @@ func New(baseURL string, timeout time.Duration) (*GRPCIDServiceClient, error) {
 		baseURL: baseURL,
 		client:  pb.NewIDServiceClient(conn),
 		conn:    conn,
+		rslv:    nil,
 	}, nil
 }
 
+/*
 func NewClient(serverAddresses string, serviceConfig string) (*GRPCIDServiceClient, error) {
 	conn, err := grpc.NewClient(
 		serverAddresses,
@@ -75,6 +78,38 @@ func NewClient(serverAddresses string, serviceConfig string) (*GRPCIDServiceClie
 			baseURL: "",
 			client:  pb.NewIDServiceClient(conn),
 			conn:    conn,
+		},
+		nil
+}
+*/
+
+func NewClient(serverAddresses string, serviceConfig string) (*GRPCIDServiceClient, error) {
+	rb := manual.NewBuilderWithScheme("local-cluster")
+	// 2. Задаем массив жестких локальных адресов (наши инстансы из launch.json)
+	rb.InitialState(resolver.State{
+		Addresses: []resolver.Address{
+			{Addr: "127.0.0.1:50051"},
+			{Addr: "127.0.0.1:50052"},
+		},
+	})
+
+	conn, err := grpc.NewClient(
+		"local-cluster:///id-service-endpoints", // Имя схемы + виртуальный путь
+		grpc.WithResolvers(rb),                  // Регистрируем наш резолвер
+		grpc.WithDefaultServiceConfig(serviceConfig),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
+
+	if err != nil {
+		// Если не удалось создать клиент, возвращаем явную ошибку
+		return nil, fmt.Errorf("failed to create grpc connection to id server: %w", err)
+	}
+
+	return &GRPCIDServiceClient{
+			baseURL: "",
+			client:  pb.NewIDServiceClient(conn),
+			conn:    conn,
+			rslv:    rb,
 		},
 		nil
 }

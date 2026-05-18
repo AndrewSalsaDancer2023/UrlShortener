@@ -2,9 +2,9 @@
 // versions:
 // - protoc-gen-go-grpc v1.6.1
 // - protoc             v3.6.1
-// source: internal/proto/idservice.proto
+// source: proto/idservice.proto
 
-package proto
+package idservice
 
 import (
 	context "context"
@@ -117,5 +117,5 @@ var IDService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "internal/proto/idservice.proto",
+	Metadata: "proto/idservice.proto",
 }

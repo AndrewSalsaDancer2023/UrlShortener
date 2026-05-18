@@ -2,9 +2,11 @@ package handler
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 
 	"github.com/gorilla/mux"
+
 	//	"urlshortener/internal/gateway/client"
 	"urlshortener/internal/gateway/handler/domain"
 	"urlshortener/internal/gateway/middleware"
@@ -76,6 +78,7 @@ func (h *GatewayHandler) Shorten(w http.ResponseWriter, r *http.Request) {
 	result, err := h.client.Generate(r.Context())
 	if err != nil {
 		requestID := middleware.GetRequestID(r.Context())
+		log.Printf("[ERROR] Status: %d | Message: %s | RequestID: %s", http.StatusBadGateway, err.Error(), requestID)
 		writeError(w, http.StatusBadGateway, "upstream error", requestID)
 		return
 	}

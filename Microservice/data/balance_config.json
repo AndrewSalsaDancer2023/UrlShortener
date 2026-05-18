@@ -1,0 +1,10 @@
+{
+    "loadBalancingConfig": [
+        {
+            "round_robin": {}
+        }
+    ],
+    "healthCheckConfig": {
+        "serviceName": ""
+    }
+}
