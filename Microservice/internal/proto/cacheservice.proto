@@ -1,0 +1,35 @@
+syntax = "proto3";
+package dbservices;
+option go_package = "./proto/cacheservice";
+
+service UrlCacheService {
+  rpc WriteURLPair(CreateRequest) returns (CreateResponse);
+  rpc GetLongURL(GetLongURLRequest) returns (GetLongURLResponse);
+  rpc GetShortURL(GetShortURLRequest) returns (GetShortURLResponse);
+}
+
+message CreateRequest {
+    int64 short_url = 1;  
+    string long_url = 2;
+}
+
+message CreateResponse {
+  int64 short_url = 1;
+}
+
+message GetLongURLRequest {
+  int64 short_url = 1;
+}
+
+message GetLongURLResponse {
+  string long_url = 1;
+}
+
+message GetShortURLRequest {
+  int64 short_url = 1;
+  string long_url = 2;
+}
+
+message GetShortURLResponse {
+  int64 short_url = 1;
+}

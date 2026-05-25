@@ -1,9 +1,12 @@
 package utils
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
@@ -44,6 +47,22 @@ func ReadJSONFile(filePath string) (string, error) {
 		return "", fmt.Errorf("invalid JSON file: %s", filePath)
 	}
 	return line, nil
+}
+
+func GetURLHash(longURL string) string {
+	hash := sha256.Sum256([]byte(longURL))
+	hashString := hex.EncodeToString(hash[:])
+	return hashString
+}
+
+func CeateShortURLKey(shortURL int64) string {
+	shortKey := "url:{" + strconv.FormatInt(shortURL, 10) + "}"
+	return shortKey
+}
+
+func CreateHashedURLKey(shortURL int64, longURL string) string {
+	longKey := "urlhashed:{" + strconv.FormatInt(shortURL, 10) + "}:" + GetURLHash(longURL)
+	return longKey
 }
 
 /*var levelStr string

@@ -10,10 +10,12 @@ import (
 
 type DBSaveURLPool interface {
 	Save(ctx context.Context, shortURL int64, longURL string) (int64, error)
+	TryConnect(ctx context.Context) error
 }
 
 type DBGetURLPool interface {
 	Load(ctx context.Context, shortURL int64) (string, error)
+	TryConnect(ctx context.Context) error
 }
 
 func CreatePool(ctx context.Context, conf *config.DBConfig) (*pgxpool.Pool, error) {
@@ -36,9 +38,10 @@ func CreatePool(ctx context.Context, conf *config.DBConfig) (*pgxpool.Pool, erro
 		return nil, err
 	}
 
-	if err := pool.Ping(ctx); err != nil {
-		pool.Close()
-		return nil, err
-	}
 	return pool, nil
+	// if err := pool.Ping(ctx); err != nil {
+	// 	pool.Close()
+	// 	return nil, err
+	// }
+	// return pool, nil
 }

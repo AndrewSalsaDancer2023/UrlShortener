@@ -10,7 +10,21 @@ type GenerateResponse struct {
 	ShortCode string `json:"short_code"`
 }
 
-// Doer — интерфейс для подмены клиента в тестах.
-type Doer interface {
-	Generate(ctx context.Context) (*GenerateResponse, error)
+// IDGeneratorInterface — интерфейс для подмены клиента в тестах.
+type IDGeneratorInterface interface {
+	Generate(context.Context) (*GenerateResponse, error)
+}
+
+type URLShortenerInterface interface {
+	Shorten(context.Context, int64, string) (int64, error)
+}
+
+type URLRestorerInterface interface {
+	Restore(context.Context, int64) (string, error)
+}
+
+type URLCacheInterface interface {
+	SaveURLPair(context.Context, int64, string) (int64, error)
+	GetShortURL(context.Context, int64, string) (int64, error)
+	GetLongURL(context.Context, int64) (string, error)
 }

@@ -15,7 +15,7 @@ type LoadURLPool struct {
 	pool *pgxpool.Pool
 }
 
-func New(ctx context.Context, dsn string, conf *config.DBConfig) (pool.DBGetURLPool, error) {
+func New(ctx context.Context, conf *config.DBConfig) (pool.DBGetURLPool, error) {
 	/*
 		config, err := pgxpool.ParseConfig(dsn)
 		if err != nil {
@@ -63,4 +63,13 @@ func (loader *LoadURLPool) Load(ctx context.Context, shortURL int64) (string, er
 	}
 
 	return longURL, nil
+}
+
+func (loader *LoadURLPool) TryConnect(ctx context.Context) error {
+	if err := loader.pool.Ping(ctx); err != nil {
+		loader.pool.Close()
+		return err
+	}
+
+	return nil
 }

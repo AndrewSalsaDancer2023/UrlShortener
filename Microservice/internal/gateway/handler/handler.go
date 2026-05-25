@@ -21,18 +21,19 @@ type RequestData struct {
 	LongURL string `json:"longUrl"`
 }
 
-// Doer — интерфейс для подмены клиента в тестах.
-// type Doer interface {
-// 	Generate(ctx context.Context) (*client.GenerateResponse, error)
-// }
-
 // GatewayHandler обрабатывает входящие запросы и проксирует их к upstream.
 type GatewayHandler struct {
-	client domain.Doer
+	idclient     domain.IDGeneratorInterface
+	urlshortener domain.URLShortenerInterface
+	urlrestorer  domain.URLRestorerInterface
+	urlcache     domain.URLCacheInterface
 }
 
-func New(c domain.Doer) *GatewayHandler {
-	return &GatewayHandler{client: c}
+func New(idclnt domain.IDGeneratorInterface,
+	shrtclnt domain.URLShortenerInterface,
+	rstclnt domain.URLRestorerInterface,
+	cache domain.URLCacheInterface) *GatewayHandler {
+	return &GatewayHandler{idclient: idclnt, urlshortener: shrtclnt, urlrestorer: rstclnt, urlcache: cache}
 }
 
 // NewRouter создаёт gorilla/mux роутер со всеми маршрутами Gateway.
@@ -75,7 +76,7 @@ func (h *GatewayHandler) Shorten(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.client.Generate(r.Context())
+	result, err := h.idclient.Generate(r.Context())
 	if err != nil {
 		requestID := middleware.GetRequestID(r.Context())
 		log.Printf("[ERROR] Status: %d | Message: %s | RequestID: %s", http.StatusBadGateway, err.Error(), requestID)

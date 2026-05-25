@@ -29,7 +29,7 @@ func main() {
 
 	/////////////////////////////////////////////////////////////////
 	// 1. Список адресов ваших генераторов (задаются при старте)
-	serverAddrs := "ipv4:///127.0.0.1:50051,127.0.0.1:50052"
+	//serverAddrs := "ipv4:///127.0.0.1:50051,127.0.0.1:50052"
 	/*
 	   	serviceConfig := `{
 	               "loadBalancingConfig": [
@@ -55,13 +55,75 @@ func main() {
 	log.SetOutput(logFile)
 	/////////////////////////////////////////////////////////////////
 	// Клиент к микросервису генерации ID
-	idClient, err := grpclient.NewClient(serverAddrs, serviceConfig)
-	if err != nil {
-		log.Fatalf("client creation error: %v", err)
+	idServiceConfig := grpclient.ClientConfig{
+		Scheme: "idgen-cluster",
+		Path:   "id-service-endpoints",
+		Addrs: []string{
+			"127.0.0.1:50051",
+			"127.0.0.1:50052",
+		},
+		ServiceConfig: serviceConfig,
 	}
-	defer idClient.Close()
+
+	idClient, err := grpclient.NewGenIDClient(idServiceConfig)
+	if err != nil {
+		log.Fatalf("ID client creation error: %v", err)
+	}
+	defer idClient.Close() // Метод Close() доступен автоматически из BaseClient
+
+	// Клиент к микросервису сокращения URL
+	urlShortenConfig := grpclient.ClientConfig{
+		Scheme: "urlshorten-cluster",
+		Path:   "shorten-service-endpoints",
+		Addrs: []string{
+			"127.0.0.1:50053",
+			"127.0.0.1:50054",
+		},
+		ServiceConfig: serviceConfig,
+	}
+
+	urlShortenClient, err := grpclient.NewURLShortenClient(urlShortenConfig)
+	if err != nil {
+		log.Fatalf("client url shorten creation error: %v", err)
+	}
+	defer urlShortenClient.Close()
+
+	// Клиент к микросервису перенаправления на исходный URL
+	urlClientConfig := grpclient.ClientConfig{
+		Scheme: "urlrestore-cluster",
+		Path:   "restore-service-endpoints",
+		Addrs: []string{
+			"127.0.0.1:50055",
+			"127.0.0.1:50056",
+		},
+		ServiceConfig: serviceConfig,
+	}
+
+	urlRestoreClient, err := grpclient.NewURLRestorerClient(urlClientConfig)
+	if err != nil {
+		log.Fatalf("url restore client creation error: %v", err)
+	}
+	defer urlRestoreClient.Close()
+
+	// Клиент к микросервису сокращения URL
+	cacheClientConfig := grpclient.ClientConfig{
+		Scheme: "urlcache-cluster",
+		Path:   "cache-service-endpoints",
+		Addrs: []string{
+			"127.0.0.1:50057",
+			"127.0.0.1:50058",
+		},
+		ServiceConfig: serviceConfig,
+	}
+
+	urlCacheClient, err := grpclient.NewURLCacheClient(cacheClientConfig)
+	if err != nil {
+		log.Fatalf("url cache client creation error: %v", err)
+	}
+	defer urlRestoreClient.Close()
+
 	// Роутер
-	h := gatewayhandler.New(idClient)
+	h := gatewayhandler.New(idClient, urlShortenClient, urlRestoreClient, urlCacheClient)
 	router := h.NewRouter()
 
 	// Цепочка middleware (применяются снаружи внутрь):

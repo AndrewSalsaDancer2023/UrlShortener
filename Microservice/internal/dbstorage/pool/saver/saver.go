@@ -48,6 +48,15 @@ func New(ctx context.Context, conf *config.DBConfig) (pool.DBSaveURLPool, error)
 	}, nil
 }
 
+func (saver *SaveURLPool) TryConnect(ctx context.Context) error {
+	if err := saver.pool.Ping(ctx); err != nil {
+		saver.pool.Close()
+		return err
+	}
+
+	return nil
+}
+
 func (saver *SaveURLPool) Save(ctx context.Context, shortURL int64, longURL string) (int64, error) {
 	query := `
                 INSERT INTO short_urls (short_url, long_url) 

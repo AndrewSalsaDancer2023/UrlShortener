@@ -11,7 +11,7 @@ import (
 	"time"
 
 	pb "urlshortener/internal/proto/dbservice"
-	"urlshortener/internal/shortenerservice/handler"
+	"urlshortener/internal/restorerservice/handler"
 
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/recovery"
@@ -22,7 +22,7 @@ import (
 	"urlshortener/utils"
 
 	config "urlshortener/internal/dbstorage/config"
-	saverpool "urlshortener/internal/dbstorage/pool/saver"
+	loaderpool "urlshortener/internal/dbstorage/pool/loader"
 
 	"google.golang.org/grpc/health"
 	healthgrpc "google.golang.org/grpc/health/grpc_health_v1"
@@ -31,135 +31,111 @@ import (
 /*
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"log"
 	"net"
 	"os"
-	"sync"
-	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	"://github.com/pgxpool"
+
+	"github.com/jackc/pgx/v5"
 	"google.golang.org/grpc"
 
-	pb "project/gen" // замените на ваш реальный путь к gen
+	pb "project/gen"
 )
 
-
-type ShortenerServer struct {
+type RedirectorServer struct {
 	pb.UnimplementedLinkServiceServer
-	db            *pgxpool.Pool
-	valkey        valkey.Client
-	mu            sync.Mutex
-	lastTimestamp int64
-	serverID      int64
-	sequence      int64
+	db     *pgxpool.Pool
+	valkey valkey.Client
 }
 
 // Конструктор внедрения зависимостей
-func NewShortenerServer(db *pgxpool.Pool, vk valkey.Client, serverID int64) *ShortenerServer {
-	return &ShortenerServer{
-		db:       db,
-		valkey:   vk,
-		serverID: serverID,
+func NewRedirectorServer(db *pgxpool.Pool, vk valkey.Client) *RedirectorServer {
+	return &RedirectorServer{
+		db:     db,
+		valkey: vk,
 	}
 }
 
-
-func (s *ShortenerServer) CreateShortURL(ctx context.Context, req *pb.CreateRequest) (*pb.CreateResponse, error) {
-	longURL := req.LongUrl
-	hashSum := sha256.Sum256([]byte(longURL))
-	urlHash := hex.EncodeToString(hashSum[:])
-
-	// 1. Проверяем кэш по хешу длинного URL
-	cacheHashKey := "ln:hash:" + urlHash
-	if val, err := s.valkey.Do(ctx, s.valkey.B().Get().Key(cacheHashKey).Build()).ToString(); err == nil {
-		return &pb.CreateResponse{ShortKey: val}, nil
-	}
-
-	// 2. Генерация 42-битного Snowflake ID
-	s.mu.Lock()
-	now := time.Now().Unix() - CustomEpoch
-	if now < s.lastTimestamp {
-		s.mu.Unlock()
-		return nil, errors.New("критический сбой: время на сервере ушло назад")
-	}
-
-	if now == s.lastTimestamp {
-		s.sequence = (s.sequence + 1) & SequenceMask
-		if s.sequence == 0 {
-			s.mu.Unlock()
-			// Пассивное ожидание начала новой секунды
-			select {
-			case <-ctx.Done():
-				return nil, ctx.Err()
-			case <-time.After(time.Until(time.Unix(now+CustomEpoch+1, 0))):
-				return s.CreateShortURL(ctx, req)
+func fromBase62(s string) int64 {
+	const charset = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	var res int64
+	for i := 0; i < len(s); i++ {
+		pos := int64(0)
+		for j := 0; j < 62; j++ {
+			if charset[j] == s[i] {
+				pos = int64(j)
+				break
 			}
 		}
-	} else {
-		s.sequence = 0
+		res = res*62 + pos
 	}
-	s.lastTimestamp = now
-	id := (now << 14) | (s.serverID << 11) | s.sequence
-	s.mu.Unlock()
+	return res
+}
 
-	// 3. Запись в Master Postgres (UPSERT)
-	var finalID int64
-	query := `INSERT INTO short_urls (id, long_url) VALUES ($1, $2)
-              ON CONFLICT (long_url) DO UPDATE SET long_url = EXCLUDED.long_url
-              RETURNING id`
-
-	if err := s.db.QueryRow(ctx, query, id, longURL).Scan(&finalID); err != nil {
-		return nil, fmt.Errorf("database error: %v", err)
-	}
-
-	shortKey := toBase62(finalID)
-
-	// 4. Наполнение кэша Valkey (Два ключа атомарно через Pipeline)
+func (s *RedirectorServer) GetOriginalURL(ctx context.Context, req *pb.GetRequest) (*pb.GetResponse, error) {
+	shortKey := req.ShortKey
 	cacheShortKey := "ln:short:" + shortKey
 
-	// Создаем пайплайн для одновременной записи
-	s.valkey.DoMulti(ctx,
-		s.valkey.B().Set().Key(cacheShortKey).Value(longURL).Ex(86400).Build(),      // Для Редиректора
-		s.valkey.B().Set().Key(cacheHashKey).Value(shortKey).Nx().Ex(86400).Build(), // Для Сокращателя
-	)
+	// 1. Быстрый поиск в кэше Valkey
+	if longURL, err := s.valkey.Do(ctx, s.valkey.B().Get().Key(cacheShortKey).Build()).ToString(); err == nil {
+		return &pb.GetResponse{LongUrl: longURL}, nil
+	}
 
-	return &pb.CreateResponse{ShortKey: shortKey}, nil
+	// 2. Декодируем Base62 строку обратно в 42-битный числовой ID
+	id := fromBase62(shortKey)
+
+	// 3. Ищем в REPLICA Postgres (target_session_attrs=read-only)
+	var longURL string
+	query := `SELECT long_url FROM short_urls WHERE id = $1;`
+
+	err := s.db.QueryRow(ctx, query, id).Scan(&longURL)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("ссылка не найдена: %s", shortKey)
+		}
+		return nil, fmt.Errorf("replica database error: %v", err)
+	}
+
+	// 4. Записываем обратно в кэш "на лету" для будущих запросов
+	s.valkey.Do(ctx, s.valkey.B().Set().Key(cacheShortKey).Value(longURL).Ex(86400).Build())
+
+	return &pb.GetResponse{LongUrl: longURL}, nil
 }
 
 func main() {
-	// Подключение к Master Postgres (target_session_attrs=read-write)
-	config, _ := pgxpool.ParseConfig(os.Getenv("DATABASE_WRITE_URL"))
-	config.MaxConns = 20
+	// Подключение к Replica Postgres (target_session_attrs=read-only)
+	config, _ := pgxpool.ParseConfig(os.Getenv("DATABASE_READ_URL"))
+	config.MaxConns = 60 // Расширенный пул для высокого rps на чтение
+	config.MinConns = 15
 	dbPool, _ := pgxpool.NewWithConfig(context.Background(), config)
 
 	// Подключение к Valkey
 	vkClient, _ := valkey.NewClient(valkey.ClientOption{InitAddress: []string{os.Getenv("VALKEY_ADDR")}})
 
-	lis, _ := net.Listen("tcp", ":50051")
+	lis, _ := net.Listen("tcp", ":50052")
 	grpcServer := grpc.NewServer()
 
 	// Внедрение зависимостей
-	server := NewShortenerServer(dbPool, vkClient, 1)
+	server := NewRedirectorServer(dbPool, vkClient)
 	pb.RegisterLinkServiceServer(grpcServer, server)
 
-	log.Println("Shortener (Writer) gRPC Service started on :50051...")
+	log.Println("Redirector (Reader) gRPC Service started on :50052...")
 	grpcServer.Serve(lis)
 }
 */
 
 func main() {
 	// 1. Конфигурация
-	cfg := config.GetURLSaverConfig()
+	cfg := config.GetURLReaderConfig()
 
-	// Создаем контекст с таймаутом в 5 секунд на базе пустого Background-контекста
-	// Функция возвращает сам контекст (ctx) и функцию отмены (cancel)
+	//Создаем контекст с таймаутом в 5 секунд на базе пустого Background-контекста
+	//Функция возвращает сам контекст (ctx) и функцию отмены (cancel)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 
-	//всегда вызывайте cancel через defer!
+	// ОБЯЗАТЕЛЬНО: всегда вызывайте cancel через defer!
 	// Это освобождает ресурсы системы (таймеры ОС), как только работа завершится,
 	// даже если она завершилась быстрее, чем за 5 секунд.
 	defer cancel()
@@ -176,7 +152,7 @@ func main() {
 	log.SetOutput(logFile)
 
 	// 3. Низкоуровневые зависимости
-	pool, err := saverpool.New(ctx, &cfg)
+	pool, err := loaderpool.New(ctx, &cfg)
 	if err != nil {
 		log.Fatalf("failed to db pool object: %v", err)
 	}
@@ -209,11 +185,9 @@ func main() {
 		),
 	)
 
-	// 6. Регистрация вашего обработчика (вместо h.NewRouter())
-	// Передаем наш svc в структуру, реализующую сгенерированный gRPC-интерфейс
-	//grpcHandler := handler.New(svc)
+	// 6. Регистрация обработчика (вместо h.NewRouter())
 	grpcHandler := handler.New(pool)
-	pb.RegisterStoreUrlServiceServer(gRPCServer, grpcHandler)
+	pb.RegisterReadUrlServiceServer(gRPCServer, grpcHandler)
 
 	// 7. Создаем health сервер и регистрируем наш gRPCServer
 	//в качестве наблюдаемого

@@ -9,23 +9,23 @@ import (
 
 type GRPCHandler struct {
 	// Встраиваем обязательную заглушку для обратной совместимости
-	pb.UnimplementedStoreUrlServiceServer
+	pb.UnimplementedReadUrlServiceServer
 	// Внедряем сервис бизнес-логики как зависимость
-	pool pool.DBSaveURLPool
+	pool pool.DBGetURLPool
 }
 
-func New(savepool pool.DBSaveURLPool) *GRPCHandler {
+func New(restpool pool.DBGetURLPool) *GRPCHandler {
 	return &GRPCHandler{
-		pool: savepool,
+		pool: restpool,
 	}
 }
 
-func (h *GRPCHandler) WriteURLPair(ctx context.Context, req *pb.CreateRequest) (*pb.CreateResponse, error) {
-	url_id, err := h.pool.Save(ctx, req.GetShortUrl(), req.GetLongUrl())
+func (h *GRPCHandler) GetLongURL(ctx context.Context, req *pb.GetRequest) (*pb.GetResponse, error) {
+	long_url, err := h.pool.Load(ctx, req.GetShortUrl())
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to store url pair %w", err)
 	}
 
-	return &pb.CreateResponse{ShortUrl: url_id}, nil
+	return &pb.GetResponse{LongUrl: long_url}, nil
 }
