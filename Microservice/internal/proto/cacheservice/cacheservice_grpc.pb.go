@@ -19,9 +19,9 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	UrlCacheService_WriteURLPair_FullMethodName = "/dbservices.UrlCacheService/WriteURLPair"
-	UrlCacheService_GetLongURL_FullMethodName   = "/dbservices.UrlCacheService/GetLongURL"
-	UrlCacheService_GetShortURL_FullMethodName  = "/dbservices.UrlCacheService/GetShortURL"
+	UrlCacheService_WriteURLPair_FullMethodName = "/cacheservice.UrlCacheService/WriteURLPair"
+	UrlCacheService_GetLongURL_FullMethodName   = "/cacheservice.UrlCacheService/GetLongURL"
+	UrlCacheService_GetShortURL_FullMethodName  = "/cacheservice.UrlCacheService/GetShortURL"
 )
 
 // UrlCacheServiceClient is the client API for UrlCacheService service.
@@ -176,7 +176,7 @@ func _UrlCacheService_GetShortURL_Handler(srv interface{}, ctx context.Context, 
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var UrlCacheService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "dbservices.UrlCacheService",
+	ServiceName: "cacheservice.UrlCacheService",
 	HandlerType: (*UrlCacheServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{

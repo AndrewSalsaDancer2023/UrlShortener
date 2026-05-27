@@ -2,12 +2,14 @@ package handler
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
+
+	"log"
 
 	"github.com/gorilla/mux"
 
 	//	"urlshortener/internal/gateway/client"
+	converter "urlshortener/internal/base62"
 	"urlshortener/internal/gateway/handler/domain"
 	"urlshortener/internal/gateway/middleware"
 )
@@ -23,17 +25,17 @@ type RequestData struct {
 
 // GatewayHandler обрабатывает входящие запросы и проксирует их к upstream.
 type GatewayHandler struct {
-	idclient     domain.IDGeneratorInterface
-	urlshortener domain.URLShortenerInterface
-	urlrestorer  domain.URLRestorerInterface
-	urlcache     domain.URLCacheInterface
+	idclient    domain.IDGeneratorInterface
+	dbshortener domain.URLShortenerInterface
+	dbrestorer  domain.URLRestorerInterface
+	urlcache    domain.URLCacheInterface
 }
 
 func New(idclnt domain.IDGeneratorInterface,
 	shrtclnt domain.URLShortenerInterface,
 	rstclnt domain.URLRestorerInterface,
 	cache domain.URLCacheInterface) *GatewayHandler {
-	return &GatewayHandler{idclient: idclnt, urlshortener: shrtclnt, urlrestorer: rstclnt, urlcache: cache}
+	return &GatewayHandler{idclient: idclnt, dbshortener: shrtclnt, dbrestorer: rstclnt, urlcache: cache}
 }
 
 // NewRouter создаёт gorilla/mux роутер со всеми маршрутами Gateway.
@@ -76,30 +78,105 @@ func (h *GatewayHandler) Shorten(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.idclient.Generate(r.Context())
+	shortURL, err := h.urlcache.GetShortURL(r.Context(), 0, data.LongURL)
+	if err != nil {
+		//произошла ошибка или запрашиваемый  LongURL не найден в кэше
+		//генерируем короткий ID для ссылки
+		requestID := middleware.GetRequestID(r.Context())
+		result, err := h.idclient.Generate(r.Context())
+		if err != nil {
+			//при генерации короткого URL произошла ошибка, возвращаем ее
+			log.Printf("[ERROR] Status: %d | Message: %s | RequestID: %s", http.StatusBadGateway, err.Error(), requestID)
+			writeError(w, http.StatusInternalServerError, "upstream error", requestID)
+			return
+		}
+		//пишем в базу пару короткий URL - длинный URL
+		shortURL, err = h.dbshortener.Shorten(r.Context(), result.NumericID, data.LongURL)
+		if err != nil {
+			//при записи в базу произошла ошибка, возвращаем её
+			log.Printf("[ERROR] Status: %d | Message: %s | RequestID: %s", http.StatusBadGateway, err.Error(), requestID)
+			writeError(w, http.StatusInternalServerError, "upstream error", requestID)
+			return
+		}
+		//пищем пару URL в кэш
+		err = h.urlcache.SaveURLPair(r.Context(), shortURL, data.LongURL)
+		if err != nil {
+			//при записи URL в кэш произошла ошибка, логируем её
+			log.Printf("[ERROR] Status: %d | Message: %s | RequestID: %s", http.StatusBadGateway, err.Error(), requestID)
+		}
+
+		encoder := converter.New()
+		res, err := encoder.Encode(shortURL)
+		if err != nil {
+			requestID := middleware.GetRequestID(r.Context())
+			log.Printf("[ERROR] Status: %d | Message: %s | RequestID: %s", http.StatusBadGateway, err.Error(), requestID)
+			writeError(w, http.StatusInternalServerError, "upstream error", requestID)
+			return
+		}
+
+		writeJSON(w, http.StatusOK, map[string]any{
+			"numeric_id": shortURL,
+			"short_code": res,
+			"short_url":  "https://short.ly/" + res,
+		})
+	}
+
+	// LongURL найден в кэше, нужно преобразовать его в строку и вернуть
+	encoder := converter.New()
+	res, err := encoder.Encode(shortURL)
 	if err != nil {
 		requestID := middleware.GetRequestID(r.Context())
 		log.Printf("[ERROR] Status: %d | Message: %s | RequestID: %s", http.StatusBadGateway, err.Error(), requestID)
-		writeError(w, http.StatusBadGateway, "upstream error", requestID)
+		writeError(w, http.StatusInternalServerError, "upstream error", requestID)
 		return
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
-		"numeric_id": result.NumericID,
-		"short_code": result.ShortCode,
-		"short_url":  "https://short.ly/" + result.ShortCode,
+		"numeric_id": shortURL,
+		"short_code": res,
+		"short_url":  "https://short.ly/" + res,
 	})
 }
 
 func (h *GatewayHandler) GetOriginal(w http.ResponseWriter, r *http.Request) {
-	shortedURL, ok := mux.Vars(r)["shorted_url"]
+	shortURL, ok := mux.Vars(r)["shorted_url"]
+	requestID := middleware.GetRequestID(r.Context())
 	if !ok {
-		requestID := middleware.GetRequestID(r.Context())
 		writeError(w, http.StatusBadRequest, "short url not specified", requestID)
 		return
 	}
+
+	resURL, err := converter.New().Decode(shortURL)
+	if err != nil {
+		log.Printf("[ERROR] Status: %d | Message: %s | RequestID: %s", http.StatusBadGateway, err.Error(), requestID)
+		writeError(w, http.StatusInternalServerError, "upstream error", requestID)
+		return
+	}
+
+	//Пробуем получить длинный URL из кеша
+	longURL, err := h.urlcache.GetLongURL(r.Context(), resURL)
+	if err != nil {
+		// не удалось достать длинный URL из кеша, попробуем в базе
+		log.Printf("[ERROR] Status: %d | Message: %s | RequestID: %s", http.StatusBadGateway, err.Error(), requestID)
+		longURL, err = h.dbrestorer.Restore(r.Context(), resURL)
+		if err != nil {
+			//в базе длинного URL также нет, сообщаем об ошибке
+			writeError(w, http.StatusInternalServerError, "no associated long URL found", requestID)
+			return
+		}
+		//в базе нашелся длинный URL, пробуем записать его в кеш
+		err := h.urlcache.SaveURLPair(r.Context(), resURL, longURL)
+		if err != nil {
+			//при записи в кеш возникла ошибка, логируем её
+			log.Printf("[ERROR] Status: %d | Message: %s | RequestID: %s", http.StatusBadGateway, err.Error(), requestID)
+		}
+		writeJSON(w, http.StatusOK, map[string]any{
+			"url": longURL,
+		})
+	}
+
 	writeJSON(w, http.StatusOK, map[string]any{
-		"url": shortedURL,
+		"url": longURL,
 	})
 }
 

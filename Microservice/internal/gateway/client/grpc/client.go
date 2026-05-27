@@ -149,10 +149,29 @@ func NewGenIDClient(cfg ClientConfig) (*GRPCIDServiceClient, error) {
 	})
 }
 
+func (c *GRPCIDServiceClient) Generate(ctx context.Context) (*domain.GenerateResponse, error) {
+	resp, err := c.client.GetNextID(ctx, &pb.IDRequest{})
+	if err != nil {
+		return nil, fmt.Errorf("grpc request failed: %w", err)
+	}
+
+	return &domain.GenerateResponse{NumericID: resp.GetId(), ShortCode: resp.GetCode()}, nil
+}
+
 func NewURLShortenClient(cfg ClientConfig) (*GRPCURLShortenerClient, error) {
 	return NewClient(cfg, pbdb.NewStoreUrlServiceClient, func(b BaseClient, api pbdb.StoreUrlServiceClient) *GRPCURLShortenerClient {
 		return &GRPCURLShortenerClient{BaseClient: b, client: api}
 	})
+}
+
+func (c *GRPCURLShortenerClient) Shorten(ctx context.Context, short_url int64, long_url string) (int64, error) {
+	resp, err := c.client.WriteURLPair(ctx, &pbdb.CreateRequest{ShortUrl: short_url, LongUrl: long_url})
+
+	if err != nil {
+		return 0, fmt.Errorf("grpc request failed: %w", err)
+	}
+
+	return resp.GetShortUrl(), nil
 }
 
 func NewURLRestorerClient(cfg ClientConfig) (*GRPCURLRestorerClient, error) {
@@ -161,10 +180,49 @@ func NewURLRestorerClient(cfg ClientConfig) (*GRPCURLRestorerClient, error) {
 	})
 }
 
+func (c *GRPCURLRestorerClient) Restore(ctx context.Context, short_url int64) (string, error) {
+	resp, err := c.client.GetLongURL(ctx, &pbdb.GetRequest{ShortUrl: short_url})
+
+	if err != nil {
+		return "", fmt.Errorf("grpc request failed: %w", err)
+	}
+
+	return resp.GetLongUrl(), nil
+}
+
 func NewURLCacheClient(cfg ClientConfig) (*GRPCURLCacheClient, error) {
 	return NewClient(cfg, pbc.NewUrlCacheServiceClient, func(b BaseClient, api pbc.UrlCacheServiceClient) *GRPCURLCacheClient {
 		return &GRPCURLCacheClient{BaseClient: b, client: api}
 	})
+}
+
+func (c *GRPCURLCacheClient) SaveURLPair(ctx context.Context, short_url int64, long_url string) error /*(int64, error)*/ {
+	/*resp*/ _, err := c.client.WriteURLPair(ctx, &pbc.CreateRequest{ShortUrl: short_url, LongUrl: long_url})
+
+	if err != nil {
+		return fmt.Errorf("grpc WriteURLPair method for cache engine failed: %w", err)
+	}
+
+	//return resp.GetShortUrl(), nil
+	return nil
+}
+
+func (c *GRPCURLCacheClient) GetShortURL(ctx context.Context, short_url int64, long_url string) (int64, error) {
+	resp, err := c.client.GetShortURL(ctx, &pbc.GetShortURLRequest{ShortUrl: short_url, LongUrl: long_url})
+	if err != nil {
+		return 0, fmt.Errorf("grpc GetShortURL method for cache engine failed: %w", err)
+	}
+
+	return resp.GetShortUrl(), nil
+}
+
+func (c *GRPCURLCacheClient) GetLongURL(ctx context.Context, short_url int64) (string, error) {
+	resp, err := c.client.GetLongURL(ctx, &pbc.GetLongURLRequest{ShortUrl: short_url})
+	if err != nil {
+		return "", fmt.Errorf("grpc GetLongURL method for cache engine failed: %w", err)
+	}
+
+	return resp.GetLongUrl(), nil
 }
 
 /*
@@ -233,60 +291,4 @@ func (c *GRPCURLRestorerClient) Close() error {
 	return nil
 }
 */
-// /////////////////////////////////////////////
-func (c *GRPCIDServiceClient) Generate(ctx context.Context) (*domain.GenerateResponse, error) {
-	resp, err := c.client.GetNextID(ctx, &pb.IDRequest{})
-	if err != nil {
-		return nil, fmt.Errorf("grpc request failed: %w", err)
-	}
-
-	return &domain.GenerateResponse{NumericID: resp.GetId(), ShortCode: resp.GetCode()}, nil
-}
-
-func (c *GRPCURLShortenerClient) Shorten(ctx context.Context, short_url int64, long_url string) (int64, error) {
-	resp, err := c.client.WriteURLPair(ctx, &pbdb.CreateRequest{ShortUrl: short_url, LongUrl: long_url})
-
-	if err != nil {
-		return 0, fmt.Errorf("grpc request failed: %w", err)
-	}
-
-	return resp.GetShortUrl(), nil
-}
-
-func (c *GRPCURLRestorerClient) Restore(ctx context.Context, short_url int64) (string, error) {
-	resp, err := c.client.GetLongURL(ctx, &pbdb.GetRequest{ShortUrl: short_url})
-
-	if err != nil {
-		return "", fmt.Errorf("grpc request failed: %w", err)
-	}
-
-	return resp.GetLongUrl(), nil
-}
-
-func (c *GRPCURLCacheClient) SaveURLPair(ctx context.Context, short_url int64, long_url string) (int64, error) {
-	resp, err := c.client.WriteURLPair(ctx, &pbc.CreateRequest{ShortUrl: short_url, LongUrl: long_url})
-
-	if err != nil {
-		return 0, fmt.Errorf("grpc WriteURLPair method for cache engine failed: %w", err)
-	}
-
-	return resp.GetShortUrl(), nil
-}
-
-func (c *GRPCURLCacheClient) GetShortURL(ctx context.Context, short_url int64, long_url string) (int64, error) {
-	resp, err := c.client.GetShortURL(ctx, &pbc.GetShortURLRequest{ShortUrl: short_url, LongUrl: long_url})
-	if err != nil {
-		return 0, fmt.Errorf("grpc GetShortURL method for cache engine failed: %w", err)
-	}
-
-	return resp.GetShortUrl(), nil
-}
-
-func (c *GRPCURLCacheClient) GetLongURL(ctx context.Context, short_url int64) (string, error) {
-	resp, err := c.client.GetLongURL(ctx, &pbc.GetLongURLRequest{ShortUrl: short_url})
-	if err != nil {
-		return "", fmt.Errorf("grpc GetLongURL method for cache engine failed: %w", err)
-	}
-
-	return resp.GetLongUrl(), nil
-}
+///////////////////////////////////////////////

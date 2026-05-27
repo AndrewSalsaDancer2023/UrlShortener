@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	ConfigPath         = "data/balance_config.json"
+	ConfigPath         = "../../data/balance_config.json"
 	GateWayLogFileName = "gateway.log"
 )
 
@@ -56,12 +56,14 @@ func GetURLHash(longURL string) string {
 }
 
 func CeateShortURLKey(shortURL int64) string {
-	shortKey := "url:{" + strconv.FormatInt(shortURL, 10) + "}"
+	// shortKey := "url:{" + strconv.FormatInt(shortURL, 10) + "}"
+	shortKey := strconv.FormatInt(shortURL, 10)
 	return shortKey
 }
 
-func CreateHashedURLKey(shortURL int64, longURL string) string {
-	longKey := "urlhashed:{" + strconv.FormatInt(shortURL, 10) + "}:" + GetURLHash(longURL)
+func CreateHashedURLKey( /*shortURL int64,*/ longURL string) string {
+	// longKey := "urlhashed:{" + strconv.FormatInt(shortURL, 10) + "}:" + GetURLHash(longURL)
+	longKey := GetURLHash(longURL)
 	return longKey
 }
 

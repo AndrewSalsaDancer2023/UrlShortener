@@ -305,8 +305,7 @@ var File_proto_cacheservice_proto protoreflect.FileDescriptor
 
 const file_proto_cacheservice_proto_rawDesc = "" +
 	"\n" +
-	"\x18proto/cacheservice.proto\x12\n" +
-	"dbservices\"G\n" +
+	"\x18proto/cacheservice.proto\x12\fcacheservice\"G\n" +
 	"\rCreateRequest\x12\x1b\n" +
 	"\tshort_url\x18\x01 \x01(\x03R\bshortUrl\x12\x19\n" +
 	"\blong_url\x18\x02 \x01(\tR\alongUrl\"-\n" +
@@ -320,12 +319,12 @@ const file_proto_cacheservice_proto_rawDesc = "" +
 	"\tshort_url\x18\x01 \x01(\x03R\bshortUrl\x12\x19\n" +
 	"\blong_url\x18\x02 \x01(\tR\alongUrl\"2\n" +
 	"\x13GetShortURLResponse\x12\x1b\n" +
-	"\tshort_url\x18\x01 \x01(\x03R\bshortUrl2\xf5\x01\n" +
-	"\x0fUrlCacheService\x12E\n" +
-	"\fWriteURLPair\x12\x19.dbservices.CreateRequest\x1a\x1a.dbservices.CreateResponse\x12K\n" +
+	"\tshort_url\x18\x01 \x01(\x03R\bshortUrl2\x81\x02\n" +
+	"\x0fUrlCacheService\x12I\n" +
+	"\fWriteURLPair\x12\x1b.cacheservice.CreateRequest\x1a\x1c.cacheservice.CreateResponse\x12O\n" +
 	"\n" +
-	"GetLongURL\x12\x1d.dbservices.GetLongURLRequest\x1a\x1e.dbservices.GetLongURLResponse\x12N\n" +
-	"\vGetShortURL\x12\x1e.dbservices.GetShortURLRequest\x1a\x1f.dbservices.GetShortURLResponseB\x16Z\x14./proto/cacheserviceb\x06proto3"
+	"GetLongURL\x12\x1f.cacheservice.GetLongURLRequest\x1a .cacheservice.GetLongURLResponse\x12R\n" +
+	"\vGetShortURL\x12 .cacheservice.GetShortURLRequest\x1a!.cacheservice.GetShortURLResponseB\x16Z\x14./proto/cacheserviceb\x06proto3"
 
 var (
 	file_proto_cacheservice_proto_rawDescOnce sync.Once
@@ -341,20 +340,20 @@ func file_proto_cacheservice_proto_rawDescGZIP() []byte {
 
 var file_proto_cacheservice_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_proto_cacheservice_proto_goTypes = []any{
-	(*CreateRequest)(nil),       // 0: dbservices.CreateRequest
-	(*CreateResponse)(nil),      // 1: dbservices.CreateResponse
-	(*GetLongURLRequest)(nil),   // 2: dbservices.GetLongURLRequest
-	(*GetLongURLResponse)(nil),  // 3: dbservices.GetLongURLResponse
-	(*GetShortURLRequest)(nil),  // 4: dbservices.GetShortURLRequest
-	(*GetShortURLResponse)(nil), // 5: dbservices.GetShortURLResponse
+	(*CreateRequest)(nil),       // 0: cacheservice.CreateRequest
+	(*CreateResponse)(nil),      // 1: cacheservice.CreateResponse
+	(*GetLongURLRequest)(nil),   // 2: cacheservice.GetLongURLRequest
+	(*GetLongURLResponse)(nil),  // 3: cacheservice.GetLongURLResponse
+	(*GetShortURLRequest)(nil),  // 4: cacheservice.GetShortURLRequest
+	(*GetShortURLResponse)(nil), // 5: cacheservice.GetShortURLResponse
 }
 var file_proto_cacheservice_proto_depIdxs = []int32{
-	0, // 0: dbservices.UrlCacheService.WriteURLPair:input_type -> dbservices.CreateRequest
-	2, // 1: dbservices.UrlCacheService.GetLongURL:input_type -> dbservices.GetLongURLRequest
-	4, // 2: dbservices.UrlCacheService.GetShortURL:input_type -> dbservices.GetShortURLRequest
-	1, // 3: dbservices.UrlCacheService.WriteURLPair:output_type -> dbservices.CreateResponse
-	3, // 4: dbservices.UrlCacheService.GetLongURL:output_type -> dbservices.GetLongURLResponse
-	5, // 5: dbservices.UrlCacheService.GetShortURL:output_type -> dbservices.GetShortURLResponse
+	0, // 0: cacheservice.UrlCacheService.WriteURLPair:input_type -> cacheservice.CreateRequest
+	2, // 1: cacheservice.UrlCacheService.GetLongURL:input_type -> cacheservice.GetLongURLRequest
+	4, // 2: cacheservice.UrlCacheService.GetShortURL:input_type -> cacheservice.GetShortURLRequest
+	1, // 3: cacheservice.UrlCacheService.WriteURLPair:output_type -> cacheservice.CreateResponse
+	3, // 4: cacheservice.UrlCacheService.GetLongURL:output_type -> cacheservice.GetLongURLResponse
+	5, // 5: cacheservice.UrlCacheService.GetShortURL:output_type -> cacheservice.GetShortURLResponse
 	3, // [3:6] is the sub-list for method output_type
 	0, // [0:3] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name

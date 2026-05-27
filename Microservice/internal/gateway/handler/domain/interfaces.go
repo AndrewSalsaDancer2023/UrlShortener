@@ -24,7 +24,7 @@ type URLRestorerInterface interface {
 }
 
 type URLCacheInterface interface {
-	SaveURLPair(context.Context, int64, string) (int64, error)
+	SaveURLPair(context.Context, int64, string) error //(int64, error)
 	GetShortURL(context.Context, int64, string) (int64, error)
 	GetLongURL(context.Context, int64) (string, error)
 }
