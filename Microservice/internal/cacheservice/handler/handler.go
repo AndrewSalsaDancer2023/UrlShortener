@@ -2,24 +2,34 @@ package handler
 
 import (
 	"context"
+	"time"
 	srv "urlshortener/internal/cacheservice"
+	"urlshortener/internal/cacheservice/config"
 	pb "urlshortener/internal/proto/cacheservice"
 )
 
 type GRPCHandler struct {
 	// Встраиваем обязательную заглушку для обратной совместимости
 	pb.UnimplementedUrlCacheServiceServer
-	service *srv.UrlCacheService
+	// service      *srv.UrlCacheService
+	service      srv.UrlCache
+	writeTiemout time.Duration
+	readTiemout  time.Duration
 }
 
-func New(srv *srv.UrlCacheService) *GRPCHandler {
+func New(srv *srv.UrlCacheService, cfg *config.CacheConfig) *GRPCHandler {
 	return &GRPCHandler{
-		service: srv,
+		service:      srv,
+		writeTiemout: cfg.WriteTimeout,
+		readTiemout:  cfg.ReadTimeout,
 	}
 }
 
 func (h *GRPCHandler) WriteURLPair(ctx context.Context, req *pb.CreateRequest) (*pb.CreateResponse, error) {
-	id, err := h.service.WriteURLPair(ctx, req.GetShortUrl(), req.GetLongUrl())
+	timeoutCtx, cancel := context.WithTimeout(ctx, h.writeTiemout)
+	defer cancel() // Обязательно освобождаем ресурсы в конце
+
+	id, err := h.service.WriteURLPair(timeoutCtx, req.GetShortUrl(), req.GetLongUrl())
 	if err != nil {
 		return nil, err
 	}
@@ -28,15 +38,21 @@ func (h *GRPCHandler) WriteURLPair(ctx context.Context, req *pb.CreateRequest) (
 }
 
 func (h *GRPCHandler) GetLongURL(ctx context.Context, req *pb.GetLongURLRequest) (*pb.GetLongURLResponse, error) {
-	long_url, err := h.service.GetLongURL(ctx, req.GetShortUrl())
+	timeoutCtx, cancel := context.WithTimeout(ctx, h.readTiemout)
+	defer cancel() // Обязательно освобождаем ресурсы в конце
+
+	longURL, err := h.service.GetLongURL(timeoutCtx, req.GetShortUrl())
 	if err != nil {
 		return nil, err
 	}
-	return &pb.GetLongURLResponse{LongUrl: long_url}, nil
+	return &pb.GetLongURLResponse{LongUrl: longURL}, nil
 }
 
 func (h *GRPCHandler) GetShortURL(ctx context.Context, req *pb.GetShortURLRequest) (*pb.GetShortURLResponse, error) {
-	short_url, err := h.service.GetShortURL(ctx, req.ShortUrl, req.LongUrl)
+	timeoutCtx, cancel := context.WithTimeout(ctx, h.readTiemout)
+	defer cancel() // Обязательно освобождаем ресурсы в конце
+
+	short_url, err := h.service.GetShortURL(timeoutCtx, req.ShortUrl, req.LongUrl)
 	if err != nil {
 		return nil, err
 	}

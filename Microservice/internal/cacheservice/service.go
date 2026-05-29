@@ -2,6 +2,7 @@ package cacheservice
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"runtime"
 	"time"
@@ -14,21 +15,23 @@ import (
 )
 
 type UrlCache interface {
-	WriteURLPair(ctx context.Context, short_url int64, long_url string) (int64, error)
-	GetLongURL(ctx context.Context, short_url int64) (string, error)
-	GetShortURL(ctx context.Context, short_url int64, long_url string) (int64, error)
+	WriteURLPair(ctx context.Context, shortURL int64, longURL string) (int64, error)
+	GetLongURL(ctx context.Context, shortURL int64) (string, error)
+	GetShortURL(ctx context.Context, shortURL int64, longURL string) (int64, error)
+	Ping(ctx context.Context) error
 }
 
 type UrlCacheService struct {
-	Client *redis.Client
+	client *redis.Client
+	ttl    time.Duration
 }
 
 func CreateService(cfg *config.CacheConfig) *redis.Client {
 	numCPU := runtime.NumCPU()
 	return redis.NewClient(&redis.Options{
-		Addr:            cfg.Host + ":" + cfg.Port, // Адрес вашего Redis-сервера
-		Password:        "",                        // Пароль (оставьте пустым, если не задан)
-		DB:              0,                         // Номер используемой базы данных
+		Addr:            cfg.Host + ":" + cfg.RedisPort, // Адрес вашего Redis-сервера
+		Password:        "",                             // Пароль (оставьте пустым, если не задан)
+		DB:              0,                              // Номер используемой базы данных
 		MinIdleConns:    cfg.MinIdleConnsMult * numCPU,
 		MaxIdleConns:    cfg.MaxIdleConnsMult * numCPU,
 		ConnMaxIdleTime: cfg.ConnMaxIdleTime,
@@ -38,12 +41,13 @@ func CreateService(cfg *config.CacheConfig) *redis.Client {
 func New(cfg *config.CacheConfig) *UrlCacheService {
 
 	return &UrlCacheService{
-		Client: CreateService(cfg),
+		client: CreateService(cfg),
+		ttl:    cfg.DataTTL,
 	}
 }
 
 func (s *UrlCacheService) Ping(ctx context.Context) error {
-	err := s.Client.Ping(ctx).Err()
+	err := s.client.Ping(ctx).Err()
 	if err != nil {
 		return err
 	}
@@ -51,51 +55,14 @@ func (s *UrlCacheService) Ping(ctx context.Context) error {
 	return nil
 }
 
-/*
-	func (s *UrlCacheService) WriteURLPair(ctx context.Context, short_url int64, long_url string) (int64, error) {
-		shortKey := utils.CeateShortURLKey(short_url)
-		hashedLongKey := utils.CreateHashedURLKey(short_url, long_url)
+func (s *UrlCacheService) TryConnectToCache() error {
+	// Создаем контекст с таймаутом в 5 секунд на базе пустого Background-контекста
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 
-		var txGetOrCreateScript = redis.NewScript(`
-		-- 1. Проверяем существование ключа
-		local existing_url = redis.call("GET", KEYS[1])
-		if existing_url then
-			return existing_url -- Ключ найден: возвращаем текущий длинный URL
-		end
-
-		-- 2. Ключа нет: атомарно записываем обе пары с TTL с помощью универсальной команды SET
-		-- Аргументы "PX" и ARGV[3] задают TTL в миллисекундах
-		-- Аргумент "NX" гарантирует, что мы не перезапишем ключ, если в микросекунду между GET и SET что-то изменилось
-		redis.call("SET", KEYS[1], ARGV[1], "PX", ARGV[3], "NX")
-		redis.call("SET", KEYS[2], ARGV[2], "PX", ARGV[3], "NX")
-
-		return nil -- Успешно создано
-		`)
-
-		keys := []string{hashedLongKey, shortKey}
-		args := []interface{}{short_url, long_url, (24 * time.Hour).Milliseconds()}
-
-		// Выполняем скрипт
-		res, err := txGetOrCreateScript.Run(ctx, s.Client, keys, args...).Int64()
-
-		if err != nil {
-			// Если скрипт вернул nil (запись успешно создана), go-redis отдаст ошибку redis.Nil
-			if errors.Is(err, redis.Nil) {
-				return short_url, nil // Успешно создано, старого URL не было
-			}
-			// Любая другая сетевая или синтаксическая ошибка
-			return 0, fmt.Errorf("lua script failed: %w", err)
-		}
-
-		// Если ошибки redis.Nil не было, значит скрипт вернул строку (существующий URL)
-		// existingURL, ok := res.(string)
-		// if !ok {
-		// 	return 0, fmt.Errorf("unexpected return type from lua script: %T", res)
-		// }
-
-		return res, nil
-	}
-*/
+	// ОБЯЗАТЕЛЬНО: всегда вызывайте cancel через defer!
+	defer cancel()
+	return s.Ping(ctx)
+}
 
 var safeDeleteScript = redis.NewScript(`
 	if redis.call("GET", KEYS[1]) == ARGV[1] then
@@ -113,15 +80,12 @@ func DeleteURLPair(client *redis.Client, shortKey string, longURL string) {
 	_, _ = safeDeleteScript.Run(cleanupCtx, client, []string{shortKey}, []string{longURL}).Result()
 }
 
-func (s *UrlCacheService) WriteURLPair(ctx context.Context, short_url int64, long_url string) (int64, error) {
-	shortKey := utils.CeateShortURLKey(short_url)
-	hashedLongKey := utils.CreateHashedURLKey( /*short_url,*/ long_url)
-
-	redisCtx, cancel := context.WithTimeout(ctx, 50*time.Millisecond)
-	defer cancel()
+func (s *UrlCacheService) WriteURLPair(ctx context.Context, shortURL int64, longURL string) (int64, error) {
+	shortKey := utils.CeateShortURLKey(shortURL)
+	hashedLongKey := utils.CreateHashedURLKey(longURL)
 
 	//Ищем, не сокращали ли мы этот URL ранее
-	existingShort, err := s.Client.Get(redisCtx, hashedLongKey).Int64() //Result()
+	existingShort, err := s.client.Get(ctx, hashedLongKey).Int64() //Result()
 	if err == nil {
 		// Найдено! Возвращаем созданный ранее короткий URL
 		return existingShort, nil
@@ -129,48 +93,51 @@ func (s *UrlCacheService) WriteURLPair(ctx context.Context, short_url int64, lon
 
 	// ЗАПИСЬ КОРОТКОЙ ССЫЛКИ: Используем SetNX
 	// Он вернет true, если ключ успешно создан, и false, если такой shortCode уже кем-то занят
-	success, err := s.Client.SetNX(redisCtx, shortKey, long_url, 24*time.Hour).Result()
+	// success, err := s.client.SetNX(ctx, shortKey, longURL, s.ttl).Result()
+	success, err := s.client.SetNX(ctx, hashedLongKey, shortURL, s.ttl).Result()
 	if err != nil {
-		return 0, status.Error(codes.Internal, "error happened during short_url : long_url pair saving")
+		return 0, fmt.Errorf("error happened during short_url : long_url pair saving: %v", err)
 	}
 
 	if !success {
-		return short_url, status.Error(codes.AlreadyExists, "short code collision, please retry")
+		return 0, fmt.Errorf("source URL : %s already added", longURL)
 	}
 
 	// Так как короткий код успешно забит за нами, связываем хэш с этим кодом
-	err = s.Client.Set(redisCtx, hashedLongKey, short_url, 24*time.Hour).Err()
+	// err = s.client.Set(ctx, hashedLongKey, shortURL, s.ttl).Err()
+	err = s.client.Set(ctx, shortKey, longURL, s.ttl).Err()
 	if err != nil {
-		/*		go func() {
-				cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 1*time.Second)
-				defer cleanupCancel()
-
-				// Скрипт удалит shortToLongKey только если его значение равно longURL
-				_, _ = safeDeleteScript.Run(cleanupCtx, s.Client, []string{shortKey}, []string{long_url}).Result()
-			}()*/
-		go DeleteURLPair(s.Client, shortKey, long_url)
+		DeleteURLPair(s.client, shortKey, longURL)
 		return 0, status.Error(codes.Internal, "error happened during long_url : short_url pair saving")
 	}
 
-	return short_url, nil
+	return shortURL, nil
 }
 
-func (s *UrlCacheService) GetLongURL(ctx context.Context, short_url int64) (string, error) {
-	shortKey := utils.CeateShortURLKey(short_url)
-	long_url, err := s.Client.Get(ctx, shortKey).Result()
+func (s *UrlCacheService) GetLongURL(ctx context.Context, shortURL int64) (string, error) {
+	shortKey := utils.CeateShortURLKey(shortURL)
+	longURL, err := s.client.Get(ctx, shortKey).Result()
 	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			//ключ hashedLongKey отсутствует в кэше
+			return "", nil
+		}
 		return "", fmt.Errorf("unexpected redis error: %v", err)
 	}
 
-	return long_url, nil
+	return longURL, nil
 }
 
-func (s *UrlCacheService) GetShortURL(ctx context.Context, short_url int64, long_url string) (int64, error) {
-	hashedLongKey := utils.CreateHashedURLKey( /*short_url,*/ long_url)
+func (s *UrlCacheService) GetShortURL(ctx context.Context, shortURL int64, longURL string) (int64, error) {
+	hashedLongKey := utils.CreateHashedURLKey(longURL)
 
-	short_url, err := s.Client.Get(ctx, hashedLongKey).Int64()
+	cacheURL, err := s.client.Get(ctx, hashedLongKey).Int64()
 	if err != nil {
-		return 0, fmt.Errorf("unexpected redis error: %v", err)
+		if errors.Is(err, redis.Nil) {
+			//ключ hashedLongKey отсутствует в кэше
+			return 0, nil
+		}
+		return 0, fmt.Errorf("unexpected redis cache error: %v", err)
 	}
-	return short_url, nil
+	return cacheURL, nil
 }

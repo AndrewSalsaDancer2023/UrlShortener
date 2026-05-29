@@ -1,4 +1,4 @@
-package cacheservice
+package main
 
 import (
 	"context"
@@ -32,14 +32,11 @@ func main() {
 	// 1. Конфигурация
 	cfg := config.GetURLCacheConfig()
 
-	// 2. Настройка gRPC-слоя и Перехватчиков (Middleware)
-	// Настройка Logger Interceptor (адаптируем стандартный логгер Go под gRPC)
-	logFileName := "grpc_server" + cfg.Port + ".log"
-	logFile, err := os.OpenFile(logFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		log.Fatalf("Не удалось открыть файл логов %s: %v", logFileName, err)
-	}
-
+	// 2. Настройка Logger Interceptor (адаптируем стандартный логгер Go под gRPC)
+	//logFileName := "grpc_server" + cfg.Port + ".log"
+	/*	logFile, err := os.OpenFile(logFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	 */
+	logFile := utils.CreateLogFile("grpc_server" + cfg.Port + ".log")
 	// Обязательно закрываем файл при завершении работы всего приложения
 	defer logFile.Close()
 	log.SetOutput(logFile)
@@ -47,11 +44,12 @@ func main() {
 	// 3. Низкоуровневые зависимости
 	srv := cache.New(&cfg)
 	// Создаем контекст с таймаутом в 5 секунд на базе пустого Background-контекста
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	/*	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 
-	// ОБЯЗАТЕЛЬНО: всегда вызывайте cancel через defer!
-	defer cancel()
-	err = srv.Ping(ctx)
+		// ОБЯЗАТЕЛЬНО: всегда вызывайте cancel через defer!
+		defer cancel()
+		err = srv.Ping(ctx)*/
+	err := srv.TryConnectToCache()
 	if err != nil {
 		log.Fatalf("Unable connect to cache service %v", err)
 	}
@@ -81,7 +79,7 @@ func main() {
 
 	// 6. Регистрация вашего обработчика (вместо h.NewRouter())
 	// Передаем наш svc в структуру, реализующую сгенерированный gRPC-интерфейс
-	grpcHandler := handler.New(srv)
+	grpcHandler := handler.New(srv, &cfg)
 	pb.RegisterUrlCacheServiceServer(gRPCServer, grpcHandler)
 
 	// 7. Создаем health сервер и регистрируем наш gRPCServer
@@ -107,6 +105,13 @@ func main() {
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 
+	// Создаем отменяемый контекст для фоновых задач приложения (включая healthcheck)
+	appCtx, appCancel := context.WithCancel(context.Background())
+	defer appCancel()
+
+	// Запускаем ваш healthcheck, передавая ему appCtx
+	go utils.StartRedisHealthCheck(appCtx, healthServer, srv)
+
 	go func() {
 		log.Printf("gRPC server listening on :%s", cfg.Port)
 		if err := gRPCServer.Serve(lis); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
@@ -117,6 +122,15 @@ func main() {
 	<-stop
 	log.Println("shutting down gRPC server...")
 
+	// 1. Срочно говорим всем балансировщикам: "Мы выключаемся, не шлите сюда людей!"
+	healthServer.SetServingStatus("", healthgrpc.HealthCheckResponse_NOT_SERVING)
+	// 2. Останавливаем фоновую горутину пинга Redis
+	appCancel()
+
+	// (Опционально) Даем балансировщику 2-3 секунды, чтобы он успел обновить свои таблицы
+	// и перенаправить новые запросы на другие поды, пока мы еще физически не закрыли порт.
+	time.Sleep(3 * time.Second)
+
 	// У gRPC есть встроенный метод GracefulStop().
 	// Он блокирует поток, ждет завершения всех активных RPC-запросов и закрывает сервер.
 	// Привязывать контекст с таймаутом вручную здесь не требуется.
@@ -124,3 +138,13 @@ func main() {
 
 	log.Println("gRPC server stopped")
 }
+
+//for debugging purpose: sudo lsof -i :5057
+//sudo kill 1234
+/*
+grpcurl -plaintext -import-path ./internal/proto -proto cacheservice.proto -d '{"short_url": 12345, "long_url": "https://google.com"}' localhost:50057 cacheservice.UrlCacheService.WriteURLPair
+
+grpcurl -plaintext -import-path ./internal/proto -proto cacheservice.proto -d '{"short_url": 12345}' localhost:50057 cacheservice.UrlCacheService.GetLongURL
+
+grpcurl -plaintext -import-path ./internal/proto -proto cacheservice.proto -d '{"long_url": "https://google.com"}' localhost:50057 cacheservice.UrlCacheService.GetShortURL
+*/
