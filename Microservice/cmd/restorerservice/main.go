@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	pb "urlshortener/internal/proto/dbservice"
 	"urlshortener/internal/restorerservice/handler"
@@ -133,31 +132,34 @@ func main() {
 
 	//Создаем контекст с таймаутом в 5 секунд на базе пустого Background-контекста
 	//Функция возвращает сам контекст (ctx) и функцию отмены (cancel)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	//ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 
 	// ОБЯЗАТЕЛЬНО: всегда вызывайте cancel через defer!
 	// Это освобождает ресурсы системы (таймеры ОС), как только работа завершится,
 	// даже если она завершилась быстрее, чем за 5 секунд.
-	defer cancel()
+	//defer cancel()
 
 	// 2. Настройка gRPC-слоя и Перехватчиков (Middleware)
 	// Настройка Logger Interceptor (адаптируем стандартный логгер Go под gRPC)
-	logFileName := "grpc_server" + cfg.Port + ".log"
-	logFile, err := os.OpenFile(logFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		log.Fatalf("Не удалось открыть файл логов %s: %v", logFileName, err)
-	}
+	/*
+		logFileName := "grpc_server" + cfg.Port + ".log"
+		logFile, err := os.OpenFile(logFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			log.Fatalf("Не удалось открыть файл логов %s: %v", logFileName, err)
+		}
+	*/
+	logFile := utils.CreateLogFile("grpc_server" + cfg.Port + ".log")
 	// Обязательно закрываем файл при завершении работы всего приложения
 	defer logFile.Close()
 	log.SetOutput(logFile)
 
 	// 3. Низкоуровневые зависимости
-	pool, err := loaderpool.New(ctx, &cfg)
+	pool, err := loaderpool.New(&cfg)
 	if err != nil {
 		log.Fatalf("failed to db pool object: %v", err)
 	}
 
-	err = pool.TryConnect(ctx)
+	err = pool.TryConnect()
 	if err != nil {
 		log.Fatalf("failed connect to db: %v", err)
 	}

@@ -15,10 +15,12 @@ import (
 )
 
 type UrlCache interface {
+	TryConnect() error
 	WriteURLPair(ctx context.Context, shortURL int64, longURL string) (int64, error)
 	GetLongURL(ctx context.Context, shortURL int64) (string, error)
 	GetShortURL(ctx context.Context, shortURL int64, longURL string) (int64, error)
 	Ping(ctx context.Context) error
+	Close() error
 }
 
 type UrlCacheService struct {
@@ -38,7 +40,7 @@ func CreateService(cfg *config.CacheConfig) *redis.Client {
 	})
 }
 
-func New(cfg *config.CacheConfig) *UrlCacheService {
+func New(cfg *config.CacheConfig) UrlCache {
 
 	return &UrlCacheService{
 		client: CreateService(cfg),
@@ -55,7 +57,11 @@ func (s *UrlCacheService) Ping(ctx context.Context) error {
 	return nil
 }
 
-func (s *UrlCacheService) TryConnectToCache() error {
+func (s *UrlCacheService) Close() error {
+	return s.client.Close()
+}
+
+func (s *UrlCacheService) TryConnect() error {
 	// Создаем контекст с таймаутом в 5 секунд на базе пустого Background-контекста
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 

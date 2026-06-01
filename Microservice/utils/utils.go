@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	// "urlshortener/internal/dbstorage/pool"
+
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
 	"google.golang.org/grpc/health"
 	healthgrpc "google.golang.org/grpc/health/grpc_health_v1"
@@ -114,17 +116,3 @@ func StartRedisHealthCheck(ctx context.Context, healthServer *health.Server, red
 		}
 	}
 }
-
-/*var levelStr string
-switch lvl {
-case logging.LevelDebug:
-	levelStr = "DEBUG"
-case logging.LevelInfo:
-	levelStr = "INFO"
-case logging.LevelWarn:
-	levelStr = "WARN"
-case logging.LevelError:
-	levelStr = "ERROR"
-default:
-	levelStr = "UNKNOWN"
-}*/

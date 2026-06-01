@@ -8,17 +8,32 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+type DBTime interface {
+	Now() time.Time
+}
+
+type DBTimeReal struct{}
+
+func (DBTimeReal) Now() time.Time {
+	return time.Now().UTC() // Рекомендуется всегда работать в UTC
+}
+
+type CommonDBPool interface {
+	TryConnect() error
+	Close()
+}
+
 type DBSaveURLPool interface {
-	Save(ctx context.Context, shortURL int64, longURL string) (int64, error)
-	TryConnect(ctx context.Context) error
+	Save(context.Context, int64, string, DBTime) (int64, error)
+	CommonDBPool
 }
 
 type DBGetURLPool interface {
-	Load(ctx context.Context, shortURL int64) (string, error)
-	TryConnect(ctx context.Context) error
+	Load(context.Context, int64) (string, error)
+	CommonDBPool
 }
 
-func CreatePool(ctx context.Context, conf *config.DBConfig) (*pgxpool.Pool, error) {
+func CreatePool(conf *config.DBConfig) (*pgxpool.Pool, error) {
 
 	config, err := pgxpool.ParseConfig(conf.Dsn)
 	if err != nil {
@@ -33,15 +48,12 @@ func CreatePool(ctx context.Context, conf *config.DBConfig) (*pgxpool.Pool, erro
 
 	config.ConnConfig.ConnectTimeout = 5 * time.Second
 
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 	pool, err := pgxpool.NewWithConfig(ctx, config)
 	if err != nil {
 		return nil, err
 	}
 
 	return pool, nil
-	// if err := pool.Ping(ctx); err != nil {
-	// 	pool.Close()
-	// 	return nil, err
-	// }
-	// return pool, nil
 }

@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	pb "urlshortener/internal/proto/dbservice"
 	"urlshortener/internal/shortenerservice/handler"
@@ -22,134 +21,12 @@ import (
 	"urlshortener/utils"
 
 	config "urlshortener/internal/dbstorage/config"
+	"urlshortener/internal/dbstorage/pool"
 	saverpool "urlshortener/internal/dbstorage/pool/saver"
 
 	"google.golang.org/grpc/health"
 	healthgrpc "google.golang.org/grpc/health/grpc_health_v1"
 )
-
-/*
-import (
-	"context"
-	"crypto/sha256"
-	"encoding/hex"
-	"errors"
-	"fmt"
-	"log"
-	"net"
-	"os"
-	"sync"
-	"time"
-
-	"github.com/jackc/pgx/v5/pgxpool"
-	"google.golang.org/grpc"
-
-	pb "project/gen" // замените на ваш реальный путь к gen
-)
-
-
-type ShortenerServer struct {
-	pb.UnimplementedLinkServiceServer
-	db            *pgxpool.Pool
-	valkey        valkey.Client
-	mu            sync.Mutex
-	lastTimestamp int64
-	serverID      int64
-	sequence      int64
-}
-
-// Конструктор внедрения зависимостей
-func NewShortenerServer(db *pgxpool.Pool, vk valkey.Client, serverID int64) *ShortenerServer {
-	return &ShortenerServer{
-		db:       db,
-		valkey:   vk,
-		serverID: serverID,
-	}
-}
-
-
-func (s *ShortenerServer) CreateShortURL(ctx context.Context, req *pb.CreateRequest) (*pb.CreateResponse, error) {
-	longURL := req.LongUrl
-	hashSum := sha256.Sum256([]byte(longURL))
-	urlHash := hex.EncodeToString(hashSum[:])
-
-	// 1. Проверяем кэш по хешу длинного URL
-	cacheHashKey := "ln:hash:" + urlHash
-	if val, err := s.valkey.Do(ctx, s.valkey.B().Get().Key(cacheHashKey).Build()).ToString(); err == nil {
-		return &pb.CreateResponse{ShortKey: val}, nil
-	}
-
-	// 2. Генерация 42-битного Snowflake ID
-	s.mu.Lock()
-	now := time.Now().Unix() - CustomEpoch
-	if now < s.lastTimestamp {
-		s.mu.Unlock()
-		return nil, errors.New("критический сбой: время на сервере ушло назад")
-	}
-
-	if now == s.lastTimestamp {
-		s.sequence = (s.sequence + 1) & SequenceMask
-		if s.sequence == 0 {
-			s.mu.Unlock()
-			// Пассивное ожидание начала новой секунды
-			select {
-			case <-ctx.Done():
-				return nil, ctx.Err()
-			case <-time.After(time.Until(time.Unix(now+CustomEpoch+1, 0))):
-				return s.CreateShortURL(ctx, req)
-			}
-		}
-	} else {
-		s.sequence = 0
-	}
-	s.lastTimestamp = now
-	id := (now << 14) | (s.serverID << 11) | s.sequence
-	s.mu.Unlock()
-
-	// 3. Запись в Master Postgres (UPSERT)
-	var finalID int64
-	query := `INSERT INTO short_urls (id, long_url) VALUES ($1, $2)
-              ON CONFLICT (long_url) DO UPDATE SET long_url = EXCLUDED.long_url
-              RETURNING id`
-
-	if err := s.db.QueryRow(ctx, query, id, longURL).Scan(&finalID); err != nil {
-		return nil, fmt.Errorf("database error: %v", err)
-	}
-
-	shortKey := toBase62(finalID)
-
-	// 4. Наполнение кэша Valkey (Два ключа атомарно через Pipeline)
-	cacheShortKey := "ln:short:" + shortKey
-
-	// Создаем пайплайн для одновременной записи
-	s.valkey.DoMulti(ctx,
-		s.valkey.B().Set().Key(cacheShortKey).Value(longURL).Ex(86400).Build(),      // Для Редиректора
-		s.valkey.B().Set().Key(cacheHashKey).Value(shortKey).Nx().Ex(86400).Build(), // Для Сокращателя
-	)
-
-	return &pb.CreateResponse{ShortKey: shortKey}, nil
-}
-
-func main() {
-	// Подключение к Master Postgres (target_session_attrs=read-write)
-	config, _ := pgxpool.ParseConfig(os.Getenv("DATABASE_WRITE_URL"))
-	config.MaxConns = 20
-	dbPool, _ := pgxpool.NewWithConfig(context.Background(), config)
-
-	// Подключение к Valkey
-	vkClient, _ := valkey.NewClient(valkey.ClientOption{InitAddress: []string{os.Getenv("VALKEY_ADDR")}})
-
-	lis, _ := net.Listen("tcp", ":50051")
-	grpcServer := grpc.NewServer()
-
-	// Внедрение зависимостей
-	server := NewShortenerServer(dbPool, vkClient, 1)
-	pb.RegisterLinkServiceServer(grpcServer, server)
-
-	log.Println("Shortener (Writer) gRPC Service started on :50051...")
-	grpcServer.Serve(lis)
-}
-*/
 
 func main() {
 	// 1. Конфигурация
@@ -157,34 +34,29 @@ func main() {
 
 	// 2. Настройка gRPC-слоя и Перехватчиков (Middleware)
 	// Настройка Logger Interceptor (адаптируем стандартный логгер Go под gRPC)
-	logFileName := "grpc_server" + cfg.Port + ".log"
-	logFile, err := os.OpenFile(logFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		log.Fatalf("Не удалось открыть файл логов %s: %v", logFileName, err)
-	}
+	/*	logFileName := "grpc_server" + cfg.Port + ".log"
+		logFile, err := os.OpenFile(logFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			log.Fatalf("Не удалось открыть файл логов %s: %v", logFileName, err)
+		}
+	*/
+	logFile := utils.CreateLogFile("grpc_server" + cfg.Port + ".log")
 	// Обязательно закрываем файл при завершении работы всего приложения
 	defer logFile.Close()
 	log.SetOutput(logFile)
 
-	// Создаем контекст с таймаутом в 5 секунд на базе пустого Background-контекста
-	// Функция возвращает сам контекст (ctx) и функцию отмены (cancel)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-
-	//всегда вызывайте cancel через defer!
-	// Это освобождает ресурсы системы (таймеры ОС), как только работа завершится,
-	// даже если она завершилась быстрее, чем за 5 секунд.
-	defer cancel()
-
 	// 3. Низкоуровневые зависимости
-	pool, err := saverpool.New(ctx, &cfg)
+	dbEngine, err := saverpool.New(&cfg)
 	if err != nil {
 		log.Fatalf("failed to create db pool object: %v", err)
 	}
 
-	err = pool.TryConnect(ctx)
+	err = dbEngine.TryConnect()
 	if err != nil {
 		log.Fatalf("failed connect to db: %v", err)
 	}
+
+	defer dbEngine.Close()
 
 	loggerOpts := []logging.Option{
 		logging.WithLogOnEvents(logging.StartCall, logging.FinishCall),
@@ -212,7 +84,8 @@ func main() {
 	// 6. Регистрация вашего обработчика (вместо h.NewRouter())
 	// Передаем наш svc в структуру, реализующую сгенерированный gRPC-интерфейс
 	//grpcHandler := handler.New(svc)
-	grpcHandler := handler.New(pool)
+	timerEngine := pool.DBTimeReal{}
+	grpcHandler := handler.New(dbEngine, &timerEngine)
 	pb.RegisterStoreUrlServiceServer(gRPCServer, grpcHandler)
 
 	// 7. Создаем health сервер и регистрируем наш gRPCServer
@@ -245,8 +118,24 @@ func main() {
 		}
 	}()
 
+	// Создаем отменяемый контекст для фоновых задач приложения (включая healthcheck)
+	//appCtx, appCancel := context.WithCancel(context.Background())
+	//defer appCancel()
+
+	// Запускаем ваш healthcheck, передавая ему appCtx
+	//go utils.StartDBHealthCheck(appCtx, healthServer, dbEngine)
+
 	<-stop
 	log.Println("shutting down gRPC server...")
+
+	// 1. Срочно говорим всем балансировщикам: "Мы выключаемся, не шлите сюда людей!"
+	healthServer.SetServingStatus("", healthgrpc.HealthCheckResponse_NOT_SERVING)
+	// 2. Останавливаем фоновую горутину пинга Redis
+	//appCancel()
+
+	// (Опционально) Даем балансировщику 2-3 секунды, чтобы он успел обновить свои таблицы
+	// и перенаправить новые запросы на другие поды, пока мы еще физически не закрыли порт.
+	//time.Sleep(3 * time.Second)
 
 	// У gRPC есть встроенный метод GracefulStop().
 	// Он блокирует поток, ждет завершения всех активных RPC-запросов и закрывает сервер.

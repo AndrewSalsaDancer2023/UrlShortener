@@ -3,6 +3,7 @@ package saver
 import (
 	"context"
 	"fmt"
+	"time"
 	"urlshortener/internal/dbstorage/config"
 	"urlshortener/internal/dbstorage/pool"
 
@@ -13,32 +14,9 @@ type SaveURLPool struct {
 	pool *pgxpool.Pool
 }
 
-func New(ctx context.Context, conf *config.DBConfig) (pool.DBSaveURLPool, error) {
-	/*
-		config, err := pgxpool.ParseConfig(dsn)
-		if err != nil {
-			return nil, err
-		}
+func New(conf *config.DBConfig) (pool.DBSaveURLPool, error) {
 
-		config.MaxConns = conf.MaxConns
-		config.MinConns = conf.MinConns
-
-		config.MaxConnIdleTime = conf.MaxConnIdleTime
-		config.MaxConnLifetime = conf.MaxConnLifetime
-
-		config.ConnConfig.ConnectTimeout = 5 * time.Second
-
-		pool, err := pgxpool.NewWithConfig(ctx, config)
-		if err != nil {
-			return nil, err
-		}
-
-		if err := pool.Ping(ctx); err != nil {
-			pool.Close()
-			return nil, err
-		}
-	*/
-	pool, err := pool.CreatePool(ctx, conf)
+	pool, err := pool.CreatePool(conf)
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +26,10 @@ func New(ctx context.Context, conf *config.DBConfig) (pool.DBSaveURLPool, error)
 	}, nil
 }
 
-func (saver *SaveURLPool) TryConnect(ctx context.Context) error {
+func (saver *SaveURLPool) TryConnect() error {
+	// Создаем контекст с таймаутом в 5 секунд на базе пустого Background-контекста
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 	if err := saver.pool.Ping(ctx); err != nil {
 		saver.pool.Close()
 		return err
@@ -57,21 +38,25 @@ func (saver *SaveURLPool) TryConnect(ctx context.Context) error {
 	return nil
 }
 
-func (saver *SaveURLPool) Save(ctx context.Context, shortURL int64, longURL string) (int64, error) {
+func (saver *SaveURLPool) Close() {
+	saver.pool.Close()
+}
+
+func (saver *SaveURLPool) Save(ctx context.Context, shortURL int64, longURL string, timer pool.DBTime) (int64, error) {
 	query := `
-                INSERT INTO short_urls (short_url, long_url) 
-                VALUES ($1, $2)
+                INSERT INTO short_urls (short_url, long_url, created_at) 
+                VALUES ($1, $2, $3)
                 ON CONFLICT (long_url) 
                 DO UPDATE SET long_url = EXCLUDED.long_url
-                RETURNING id;
+                RETURNING short_url;
         `
 
-	var finalID int64
-	// pgx автоматически использует Prepared Statements под капотом для ускорения
-	err := saver.pool.QueryRow(ctx, query, shortURL, longURL).Scan(&finalID)
+	var savedShortURL int64
+	creationTime := timer.Now()
+	err := saver.pool.QueryRow(ctx, query, shortURL, longURL, creationTime).Scan(&savedShortURL)
 	if err != nil {
 		return 0, fmt.Errorf("url pair insert error: %w", err)
 	}
 
-	return finalID, nil
+	return savedShortURL, nil
 }

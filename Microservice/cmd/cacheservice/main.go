@@ -13,16 +13,15 @@ import (
 	"urlshortener/internal/cacheservice/handler"
 	pb "urlshortener/internal/proto/cacheservice"
 
+	cache "urlshortener/internal/cacheservice"
+	config "urlshortener/internal/cacheservice/config"
+	"urlshortener/utils"
+
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/recovery"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-
-	"urlshortener/utils"
-
-	cache "urlshortener/internal/cacheservice"
-	config "urlshortener/internal/cacheservice/config"
 
 	"google.golang.org/grpc/health"
 	healthgrpc "google.golang.org/grpc/health/grpc_health_v1"
@@ -49,10 +48,11 @@ func main() {
 		// ОБЯЗАТЕЛЬНО: всегда вызывайте cancel через defer!
 		defer cancel()
 		err = srv.Ping(ctx)*/
-	err := srv.TryConnectToCache()
+	err := srv.TryConnect()
 	if err != nil {
 		log.Fatalf("Unable connect to cache service %v", err)
 	}
+	defer srv.Close()
 
 	loggerOpts := []logging.Option{
 		logging.WithLogOnEvents(logging.StartCall, logging.FinishCall),

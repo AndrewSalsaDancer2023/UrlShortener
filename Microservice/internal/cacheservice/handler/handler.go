@@ -17,7 +17,7 @@ type GRPCHandler struct {
 	readTiemout  time.Duration
 }
 
-func New(srv *srv.UrlCacheService, cfg *config.CacheConfig) *GRPCHandler {
+func New(srv srv.UrlCache, cfg *config.CacheConfig) *GRPCHandler {
 	return &GRPCHandler{
 		service:      srv,
 		writeTiemout: cfg.WriteTimeout,

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 	"urlshortener/internal/dbstorage/config"
 	"urlshortener/internal/dbstorage/pool"
 
@@ -15,7 +16,7 @@ type LoadURLPool struct {
 	pool *pgxpool.Pool
 }
 
-func New(ctx context.Context, conf *config.DBConfig) (pool.DBGetURLPool, error) {
+func New(conf *config.DBConfig) (pool.DBGetURLPool, error) {
 	/*
 		config, err := pgxpool.ParseConfig(dsn)
 		if err != nil {
@@ -40,7 +41,7 @@ func New(ctx context.Context, conf *config.DBConfig) (pool.DBGetURLPool, error) 
 			return nil, err
 		}
 	*/
-	pool, err := pool.CreatePool(ctx, conf)
+	pool, err := pool.CreatePool(conf)
 	if err != nil {
 		return nil, err
 	}
@@ -65,11 +66,18 @@ func (loader *LoadURLPool) Load(ctx context.Context, shortURL int64) (string, er
 	return longURL, nil
 }
 
-func (loader *LoadURLPool) TryConnect(ctx context.Context) error {
+func (loader *LoadURLPool) TryConnect() error {
+	// Создаем контекст с таймаутом в 5 секунд на базе пустого Background-контекста
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 	if err := loader.pool.Ping(ctx); err != nil {
 		loader.pool.Close()
 		return err
 	}
 
 	return nil
+}
+
+func (loader *LoadURLPool) Close() {
+	loader.pool.Close()
 }
