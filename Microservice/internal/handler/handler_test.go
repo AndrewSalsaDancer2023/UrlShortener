@@ -40,7 +40,7 @@ func newRouter(t *testing.T) http.Handler {
 	t.Helper()
 	gen, err := generator.New(generator.Config{DatacenterID: 1, MachineID: 1})
 	require.NoError(t, err)
-	svc := service.New(gen, base62.New())
+	svc := service.New(gen, base62.NewEncoder())
 	h := handler.New(svc)
 	return h.NewRouter()
 }

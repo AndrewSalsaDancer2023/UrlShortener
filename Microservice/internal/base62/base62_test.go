@@ -10,7 +10,7 @@ import (
 	"urlshortener/internal/base62"
 )
 
-func enc() *base62.Base62Encoder { return base62.New() }
+func enc() *base62.Base62Encoder { return base62.NewEncoder() }
 
 func TestEncode_Zero(t *testing.T) {
 	s, err := enc().Encode(0)
@@ -85,7 +85,7 @@ func TestEncode_MaxLength(t *testing.T) {
 }
 
 func BenchmarkEncode(b *testing.B) {
-	e := base62.New()
+	e := base62.NewEncoder()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_, _ = e.Encode(7816251636736237568)

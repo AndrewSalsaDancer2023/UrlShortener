@@ -19,11 +19,18 @@ type DBConfig struct {
 	// максимальный размер пула
 	MaxConns int32
 
+	// максимальное время жизни соединения
+	//MaxConnLifetime time.Duration
+
+	// максимальное время на установку одного физического TCP-соединения
+	MaxConnectTimeout time.Duration
+
 	// максимальное время простоя соединения
 	MaxConnIdleTime time.Duration
-
-	// максимальное время жизни соединения
-	MaxConnLifetime time.Duration
+	//таймаут на чтение
+	ReadTimeout time.Duration
+	//таймаут на запись
+	WriteTimeout time.Duration
 }
 
 func GetEnvInt(key string, def int) int {

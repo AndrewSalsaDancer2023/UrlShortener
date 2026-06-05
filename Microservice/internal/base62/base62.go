@@ -19,7 +19,7 @@ type Encoder interface {
 // Base62Encoder — реализация кодирования в Base62.
 type Base62Encoder struct{}
 
-func New() *Base62Encoder {
+func NewEncoder() *Base62Encoder {
 	return &Base62Encoder{}
 }
 

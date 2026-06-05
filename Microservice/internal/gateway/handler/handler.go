@@ -9,6 +9,7 @@ import (
 	"github.com/gorilla/mux"
 
 	//	"urlshortener/internal/gateway/client"
+	"urlshortener/internal/base62"
 	converter "urlshortener/internal/base62"
 	"urlshortener/internal/gateway/handler/domain"
 	"urlshortener/internal/gateway/middleware"
@@ -29,13 +30,16 @@ type GatewayHandler struct {
 	dbshortener domain.URLShortenerInterface
 	dbrestorer  domain.URLRestorerInterface
 	urlcache    domain.URLCacheInterface
+	converter   base62.Encoder
 }
 
-func New(idclnt domain.IDGeneratorInterface,
+func New(converter base62.Encoder,
+	idclnt domain.IDGeneratorInterface,
 	shrtclnt domain.URLShortenerInterface,
 	rstclnt domain.URLRestorerInterface,
 	cache domain.URLCacheInterface) *GatewayHandler {
-	return &GatewayHandler{idclient: idclnt, dbshortener: shrtclnt, dbrestorer: rstclnt, urlcache: cache}
+	return &GatewayHandler{idclient: idclnt, dbshortener: shrtclnt,
+		dbrestorer: rstclnt, urlcache: cache, converter: converter}
 }
 
 // NewRouter создаёт gorilla/mux роутер со всеми маршрутами Gateway.
@@ -182,8 +186,8 @@ func (h *GatewayHandler) Shorten(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 2. Кодируем ID в короткий код (общая логика для обоих путей)
-	encoder := converter.New()
-	res, err := encoder.Encode(shortURL)
+	//encoder := converter.New()
+	res, err := h.converter.Encode(shortURL)
 	if err != nil {
 		log.Printf("[ERROR] Status: %d | Message: %s | RequestID: %s", http.StatusBadGateway, err.Error(), requestID)
 		writeError(w, http.StatusInternalServerError, "upstream error", requestID)
@@ -250,7 +254,7 @@ func (h *GatewayHandler) GetOriginal(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Декодируем короткую строку обратно в числовой Snowflake ID
-	numericID, err := converter.New().Decode(shortCode)
+	numericID, err := converter.NewEncoder().Decode(shortCode)
 	if err != nil {
 		log.Printf("[ERROR] Decode failed | Message: %s | RequestID: %s", err.Error(), requestID)
 		writeError(w, http.StatusBadRequest, "invalid short url format", requestID)

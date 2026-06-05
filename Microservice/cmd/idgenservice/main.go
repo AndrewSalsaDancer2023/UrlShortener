@@ -43,7 +43,7 @@ func main() {
 		log.Fatalf("failed to create generator: %v", err)
 	}
 
-	encoder := base62.New()
+	encoder := base62.NewEncoder()
 
 	// 3. Настройка gRPC-слоя и Перехватчиков (Middleware)
 

@@ -159,6 +159,7 @@ func main() {
 		log.Fatalf("failed to db pool object: %v", err)
 	}
 
+	defer pool.Close()
 	err = pool.TryConnect()
 	if err != nil {
 		log.Fatalf("failed connect to db: %v", err)
@@ -188,7 +189,7 @@ func main() {
 	)
 
 	// 6. Регистрация обработчика (вместо h.NewRouter())
-	grpcHandler := handler.New(pool)
+	grpcHandler := handler.New(pool, cfg.ReadTimeout)
 	pb.RegisterReadUrlServiceServer(gRPCServer, grpcHandler)
 
 	// 7. Создаем health сервер и регистрируем наш gRPCServer
@@ -231,3 +232,10 @@ func main() {
 
 	log.Println("gRPC server stopped")
 }
+
+/*
+Code: Unknown
+  Message: failed to store url pair ERROR: relation "short_urls" does not exist (SQLSTATE 42P01)
+
+grpcurl -plaintext -import-path ./internal/proto -proto dbservices.proto -d '{"short_url": 12345 }' localhost:50054 dbservices.ReadUrlService.GetLongURL
+*/

@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"fmt"
+	"time"
 	"urlshortener/internal/dbstorage/pool"
 	pb "urlshortener/internal/proto/dbservice"
 )
@@ -11,17 +12,21 @@ type GRPCHandler struct {
 	// Встраиваем обязательную заглушку для обратной совместимости
 	pb.UnimplementedReadUrlServiceServer
 	// Внедряем сервис бизнес-логики как зависимость
-	pool pool.DBGetURLPool
+	pool        pool.DBGetURLPool
+	readTiemout time.Duration
 }
 
-func New(restpool pool.DBGetURLPool) *GRPCHandler {
+func New(restpool pool.DBGetURLPool, timeOut time.Duration) *GRPCHandler {
 	return &GRPCHandler{
-		pool: restpool,
+		pool:        restpool,
+		readTiemout: timeOut,
 	}
 }
 
 func (h *GRPCHandler) GetLongURL(ctx context.Context, req *pb.GetRequest) (*pb.GetResponse, error) {
-	long_url, err := h.pool.Load(ctx, req.GetShortUrl())
+	timeoutCtx, cancel := context.WithTimeout(ctx, h.readTiemout)
+	defer cancel() // Обязательно освобождаем ресурсы в конце
+	long_url, err := h.pool.Load(timeoutCtx, req.GetShortUrl())
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to store url pair %w", err)

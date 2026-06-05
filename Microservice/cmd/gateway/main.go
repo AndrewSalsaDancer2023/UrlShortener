@@ -15,6 +15,7 @@ import (
 	"urlshortener/utils"
 
 	//	client "urlshortener/internal/gateway/client/http"
+	"urlshortener/internal/base62"
 	gatewayhandler "urlshortener/internal/gateway/handler"
 	gatewaymiddleware "urlshortener/internal/gateway/middleware"
 	/*
@@ -121,9 +122,9 @@ func main() {
 		log.Fatalf("url cache client creation error: %v", err)
 	}
 	defer urlRestoreClient.Close()
-
+	converter := base62.NewEncoder()
 	// Роутер
-	h := gatewayhandler.New(idClient, urlShortenClient, urlRestoreClient, urlCacheClient)
+	h := gatewayhandler.New(converter, idClient, urlShortenClient, urlRestoreClient, urlCacheClient)
 	router := h.NewRouter()
 
 	// Цепочка middleware (применяются снаружи внутрь):

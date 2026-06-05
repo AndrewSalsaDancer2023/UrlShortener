@@ -17,30 +17,7 @@ type LoadURLPool struct {
 }
 
 func New(conf *config.DBConfig) (pool.DBGetURLPool, error) {
-	/*
-		config, err := pgxpool.ParseConfig(dsn)
-		if err != nil {
-			return nil, err
-		}
 
-		config.MaxConns = conf.MaxConns
-		config.MinConns = conf.MinConns
-
-		config.MaxConnIdleTime = conf.MaxConnIdleTime
-		config.MaxConnLifetime = conf.MaxConnLifetime
-
-		config.ConnConfig.ConnectTimeout = 5 * time.Second
-
-		pool, err := pgxpool.NewWithConfig(ctx, config)
-		if err != nil {
-			return nil, err
-		}
-
-		if err := pool.Ping(ctx); err != nil {
-			pool.Close()
-			return nil, err
-		}
-	*/
 	pool, err := pool.CreatePool(conf)
 	if err != nil {
 		return nil, err

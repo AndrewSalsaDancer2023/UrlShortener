@@ -50,13 +50,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to create db pool object: %v", err)
 	}
+	defer dbEngine.Close()
 
 	err = dbEngine.TryConnect()
 	if err != nil {
 		log.Fatalf("failed connect to db: %v", err)
 	}
-
-	defer dbEngine.Close()
 
 	loggerOpts := []logging.Option{
 		logging.WithLogOnEvents(logging.StartCall, logging.FinishCall),
@@ -85,7 +84,7 @@ func main() {
 	// Передаем наш svc в структуру, реализующую сгенерированный gRPC-интерфейс
 	//grpcHandler := handler.New(svc)
 	timerEngine := pool.DBTimeReal{}
-	grpcHandler := handler.New(dbEngine, &timerEngine)
+	grpcHandler := handler.New(dbEngine, &timerEngine, cfg.WriteTimeout)
 	pb.RegisterStoreUrlServiceServer(gRPCServer, grpcHandler)
 
 	// 7. Создаем health сервер и регистрируем наш gRPCServer
@@ -144,3 +143,15 @@ func main() {
 
 	log.Println("gRPC server stopped")
 }
+
+/*
+grpcurl -plaintext -import-path ./internal/proto -proto dbservices.proto -d '{"short_url": 12345, "long_url": "https://google.com"}' localhost:50053 dbservices.StoreUrlService.WriteURLPair
+
+"url pair insert error: ERROR: relation \"short_urls\" does not exist (SQLSTATE 42P01)"
+
+ERROR:
+  Code: Unknown
+  Message: failed to store url pair url pair insert error: ERROR: relation "short_urls" does not exist (SQLSTATE 42P01)
+
+  error(*pgconn.PgError) *{Severity: "ERROR", SeverityUnlocalized: "ERROR", Code: "42P01", Message: "relation \"short_urls\" does not exist", Detail: "", Hint: "", Position: 30, InternalPosition: 0, InternalQuery: "", Where: "", SchemaName: "", TableName: "", ColumnName: "", DataTypeName: "", ConstraintName: "", File: "parse_relation.c", Line: 1191, Routine: "parserOpenTable"}
+*/

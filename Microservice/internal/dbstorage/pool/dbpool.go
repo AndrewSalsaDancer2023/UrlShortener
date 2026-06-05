@@ -33,21 +33,29 @@ type DBGetURLPool interface {
 	CommonDBPool
 }
 
+func CreatePoolConfig(dbConf *config.DBConfig, poolConf *pgxpool.Config) {
+	poolConf.MinConns = dbConf.MinConns
+	poolConf.MaxConns = dbConf.MaxConns
+	poolConf.MaxConnIdleTime = dbConf.MaxConnIdleTime
+	poolConf.ConnConfig.ConnectTimeout = dbConf.MaxConnectTimeout
+}
+
 func CreatePool(conf *config.DBConfig) (*pgxpool.Pool, error) {
 
 	config, err := pgxpool.ParseConfig(conf.Dsn)
 	if err != nil {
 		return nil, err
 	}
+	/*
+		config.MaxConns = conf.MaxConns
+		config.MinConns = conf.MinConns
 
-	config.MaxConns = conf.MaxConns
-	config.MinConns = conf.MinConns
+		config.MaxConnIdleTime = conf.MaxConnIdleTime
+		config.MaxConnLifetime = conf.MaxConnLifetime
 
-	config.MaxConnIdleTime = conf.MaxConnIdleTime
-	config.MaxConnLifetime = conf.MaxConnLifetime
-
-	config.ConnConfig.ConnectTimeout = 5 * time.Second
-
+		config.ConnConfig.ConnectTimeout = 5 * time.Second
+	*/
+	CreatePoolConfig(conf, config)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	pool, err := pgxpool.NewWithConfig(ctx, config)
