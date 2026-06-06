@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"urlshortener/internal/base62"
+	"urlshortener/internal/dbstorage/pool"
 	"urlshortener/internal/generator"
 	"urlshortener/internal/handler"
 	service "urlshortener/internal/idgenservice"
@@ -38,7 +39,8 @@ func (m *mockEncoder) Decode(string) (int64, error) { return 0, nil }
 // newRouter собирает роутер с реальными зависимостями.
 func newRouter(t *testing.T) http.Handler {
 	t.Helper()
-	gen, err := generator.New(generator.Config{DatacenterID: 1, MachineID: 1})
+	timeEngine := pool.UnixTimeReal{}
+	gen, err := generator.New(&generator.Config{DatacenterID: 1, MachineID: 1}, timeEngine)
 	require.NoError(t, err)
 	svc := service.New(gen, base62.NewEncoder())
 	h := handler.New(svc)

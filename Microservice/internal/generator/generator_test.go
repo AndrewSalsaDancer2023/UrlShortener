@@ -4,15 +4,17 @@ import (
 	"sync"
 	"testing"
 
+	"urlshortener/internal/dbstorage/pool"
+	"urlshortener/internal/generator"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"urlshortener/internal/generator"
 )
 
 func newGen(t *testing.T) *generator.Generator {
 	t.Helper()
-	g, err := generator.New(generator.Config{DatacenterID: 0, MachineID: 0})
+	timeEngine := pool.UnixTimeReal{}
+	g, err := generator.New(&generator.Config{DatacenterID: 0, MachineID: 0}, timeEngine)
 	require.NoError(t, err)
 	return g
 }
@@ -25,23 +27,26 @@ func TestNew_ValidConfig(t *testing.T) {
 		{DatacenterID: generator.MaxDatacenterID, MachineID: generator.MaxMachineID},
 		{DatacenterID: 1, MachineID: 1},
 	}
+	timeEngine := pool.UnixTimeReal{}
 	for _, cfg := range cases {
-		g, err := generator.New(cfg)
+		g, err := generator.New(&cfg, timeEngine)
 		assert.NoError(t, err)
 		assert.NotNil(t, g)
 	}
 }
 
 func TestNew_InvalidDatacenterID(t *testing.T) {
+	timeEngine := pool.UnixTimeReal{}
 	for _, id := range []int64{-1, generator.MaxDatacenterID + 1} {
-		_, err := generator.New(generator.Config{DatacenterID: id})
+		_, err := generator.New(&generator.Config{DatacenterID: id}, timeEngine)
 		assert.Error(t, err, "DatacenterID=%d must be rejected", id)
 	}
 }
 
 func TestNew_InvalidMachineID(t *testing.T) {
+	timeEngine := pool.UnixTimeReal{}
 	for _, id := range []int64{-1, generator.MaxMachineID + 1} {
-		_, err := generator.New(generator.Config{MachineID: id})
+		_, err := generator.New(&generator.Config{MachineID: id}, timeEngine)
 		assert.Error(t, err, "MachineID=%d must be rejected", id)
 	}
 }
@@ -111,7 +116,8 @@ func TestNextID_Concurrent_Unique(t *testing.T) {
 }
 
 func BenchmarkNextID(b *testing.B) {
-	g, _ := generator.New(generator.Config{DatacenterID: 1, MachineID: 1})
+	timeEngine := pool.UnixTimeReal{}
+	g, _ := generator.New(&generator.Config{DatacenterID: 1, MachineID: 1}, timeEngine)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_, _ = g.NextID()

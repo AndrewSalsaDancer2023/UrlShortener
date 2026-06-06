@@ -78,7 +78,7 @@ func main() {
 		Path:   "shorten-service-endpoints",
 		Addrs: []string{
 			"127.0.0.1:50053",
-			"127.0.0.1:50054",
+			//"127.0.0.1:50054",
 		},
 		ServiceConfig: serviceConfig,
 	}
@@ -94,8 +94,9 @@ func main() {
 		Scheme: "urlrestore-cluster",
 		Path:   "restore-service-endpoints",
 		Addrs: []string{
-			"127.0.0.1:50055",
-			"127.0.0.1:50056",
+			"127.0.0.1:50054",
+			//		"127.0.0.1:50055",
+			//		"127.0.0.1:50056",
 		},
 		ServiceConfig: serviceConfig,
 	}

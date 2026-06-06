@@ -12,18 +12,18 @@ type GRPCHandler struct {
 	pb.UnimplementedIDServiceServer
 
 	// Внедряем сервис бизнес-логики как зависимость
-	svc *service.IDService
+	gsv *service.IDService
 }
 
 // New — конструктор для создания вашего gRPC-обработчика
 func New(svc *service.IDService) *GRPCHandler {
 	return &GRPCHandler{
-		svc: svc,
+		gsv: svc,
 	}
 }
 
 func (h *GRPCHandler) GetNextID(ctx context.Context, req *pb.IDRequest) (*pb.IDResponse, error) {
-	id, err := h.svc.Generate()
+	id, err := h.gsv.Generate()
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate id: %w", err)
 	}

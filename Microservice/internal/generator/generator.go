@@ -4,6 +4,7 @@ import (
 	"errors"
 	"sync"
 	"time"
+	"urlshortener/internal/dbstorage/pool"
 )
 
 const (
@@ -37,6 +38,7 @@ type Generator struct {
 	machineID     int64
 	sequence      int64
 	lastTimestamp int64
+	timeEngine    pool.DBTime
 }
 
 type Config struct {
@@ -45,7 +47,7 @@ type Config struct {
 	MachineID    int64
 }
 
-func New(cfg Config) (*Generator, error) {
+func New(cfg *Config, timeEngine pool.DBTime) (*Generator, error) {
 	if cfg.DatacenterID < 0 || cfg.DatacenterID > MaxDatacenterID {
 		return nil, errors.New("datacenterID must be between 0 and 3")
 	}
@@ -59,6 +61,7 @@ func New(cfg Config) (*Generator, error) {
 		datacenterID:  cfg.DatacenterID,
 		machineID:     cfg.MachineID,
 		lastTimestamp: -1,
+		timeEngine:    timeEngine,
 	}, nil
 }
 
@@ -66,7 +69,8 @@ func (g *Generator) NextID() (int64, error) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 
-	now := time.Now().Unix()
+	// now := time.Now().Unix()
+	now := g.timeEngine.Now().Unix()
 
 	if now < g.lastTimestamp {
 		return 0, errors.New("clock moved backwards, refusing to generate ID")
@@ -74,7 +78,7 @@ func (g *Generator) NextID() (int64, error) {
 	if now == g.lastTimestamp {
 		g.sequence = (g.sequence + 1) & MaxSequence
 		if g.sequence == 0 {
-			now = g.waitNextSecond(g.lastTimestamp)
+			now = g.waitNextTime(now, g.lastTimestamp)
 		}
 	} else {
 		g.sequence = 0
@@ -94,11 +98,24 @@ func (g *Generator) NextID() (int64, error) {
 	return id, nil
 }
 
-func (g *Generator) waitNextSecond(last int64) int64 {
-	now := time.Now().Unix()
+func (g *Generator) waitNextTime(now int64, last int64) int64 {
+	// now := time.Now().Unix()
+	// now := g.timeEngine.Now().Unix()
 	for now <= last {
-		//		time.Sleep(10 * time.Millisecond)
-		now = time.Now().Unix()
+		/*
+			diff := last - now
+			time.Sleep(time.Duration(diff) * time.Second)
+			now = g.timeEngine.Now().Unix()
+		*/
+		exactNow := g.timeEngine.Now()
+		// Считаем, сколько миллисекунд осталось до конца текущей секунды
+		// exactNow.Nanosecond() / 1e6 переводит наносекунды в миллисекунды (0-999)
+		msPassed := exactNow.Nanosecond() / int(time.Millisecond)
+		msToWait := 1000 - msPassed
+		time.Sleep(time.Duration(msToWait+1) * time.Millisecond)
+
+		// Обновляем Unix-время для проверки условия цикла
+		now = g.timeEngine.Now().Unix()
 	}
 
 	return now

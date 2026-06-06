@@ -18,6 +18,12 @@ func (DBTimeReal) Now() time.Time {
 	return time.Now().UTC() // Рекомендуется всегда работать в UTC
 }
 
+type UnixTimeReal struct{}
+
+func (UnixTimeReal) Now() time.Time {
+	return time.Now()
+}
+
 type CommonDBPool interface {
 	TryConnect() error
 	Close()

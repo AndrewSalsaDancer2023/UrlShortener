@@ -17,13 +17,14 @@ import (
 	"urlshortener/internal/idgenservice/handler"
 	pb "urlshortener/internal/proto/idservice"
 
+	"urlshortener/internal/dbstorage/pool"
+	"urlshortener/utils"
+
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/recovery"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-
-	"urlshortener/utils"
 
 	"google.golang.org/grpc/health"
 	healthgrpc "google.golang.org/grpc/health/grpc_health_v1"
@@ -32,22 +33,18 @@ import (
 func main() {
 	// 1. Конфигурация
 	cfg := config.Load()
-
+	timeEngine := pool.UnixTimeReal{}
 	// 2. Низкоуровневые зависимости
-	gen, err := generator.New(generator.Config{
+	gen, err := generator.New(&generator.Config{
 		//		Epoch:        cfg.Epoch,
 		DatacenterID: cfg.DatacenterID,
 		MachineID:    cfg.MachineID,
-	})
+	}, timeEngine)
 	if err != nil {
 		log.Fatalf("failed to create generator: %v", err)
 	}
 
-	encoder := base62.NewEncoder()
-
 	// 3. Настройка gRPC-слоя и Перехватчиков (Middleware)
-
-	svc := service.New(gen, encoder /*, bus*/)
 	// Настройка Logger Interceptor (адаптируем стандартный логгер Go под gRPC)
 	logFileName := "grpc_server" + cfg.Port + ".log"
 	logFile, err := os.OpenFile(logFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
@@ -77,12 +74,15 @@ func main() {
 	gRPCServer := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
 			recovery.UnaryServerInterceptor(recoveryOpts...),
+			utils.EnforceDeadlineInterceptor(),
 			logging.UnaryServerInterceptor(grpcLogger, loggerOpts...),
 		),
 	)
 
 	// 6. Регистрация вашего обработчика (вместо h.NewRouter())
 	// Передаем наш svc в структуру, реализующую сгенерированный gRPC-интерфейс
+	encoder := base62.NewEncoder()
+	svc := service.New(gen, encoder /*, bus*/)
 	grpcHandler := handler.New(svc)
 	pb.RegisterIDServiceServer(gRPCServer, grpcHandler)
 

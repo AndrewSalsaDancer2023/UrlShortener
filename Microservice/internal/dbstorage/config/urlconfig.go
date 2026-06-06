@@ -25,7 +25,7 @@ func GetURLReaderConfig() DBConfig {
 		MaxConns:          int32(GetEnvInt("MAX_CONNECTIONS", 32)),
 		MaxConnIdleTime:   GetEnvDuration("MAX_IDDLE_TIME", 5*time.Second),
 		MaxConnectTimeout: GetEnvDuration("MAX_CONNECT_TIMEOUT", 3*time.Second),
-		ReadTimeout:       GetEnvDuration("MAXREADTIME", 50*time.Millisecond),
+		ReadTimeout:       GetEnvDuration("MAXREADTIME", 100*time.Millisecond),
 		// MaxConnLifetime: GetEnvDuration("CONN_LIFE_TIME", 30*time.Minute),
 	}
 }

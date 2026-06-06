@@ -29,7 +29,7 @@ func (h *GRPCHandler) GetLongURL(ctx context.Context, req *pb.GetRequest) (*pb.G
 	long_url, err := h.pool.Load(timeoutCtx, req.GetShortUrl())
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to store url pair %w", err)
+		return nil, fmt.Errorf("failed to get long url %w", err)
 	}
 
 	return &pb.GetResponse{LongUrl: long_url}, nil

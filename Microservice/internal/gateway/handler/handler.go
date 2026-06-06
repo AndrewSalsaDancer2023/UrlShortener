@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/gorilla/mux"
 
@@ -160,7 +161,10 @@ func (h *GatewayHandler) generateAndSaveURL(ctx context.Context, longURL, reques
 }
 
 func (h *GatewayHandler) Shorten(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
+	//ctx := r.Context()
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Minute)
+	defer cancel()
+
 	requestID := middleware.GetRequestID(ctx)
 
 	var data RequestData
@@ -176,7 +180,7 @@ func (h *GatewayHandler) Shorten(w http.ResponseWriter, r *http.Request) {
 
 	// 1. Пытаемся получить из кэша
 	shortURL, err := h.urlcache.GetShortURL(ctx, 0, data.LongURL)
-	if err != nil {
+	if (err != nil) || (shortURL == 0) {
 		// Кэш-мисс или ошибка кэша: генерируем и сохраняем новый URL
 		shortURL, err = h.generateAndSaveURL(ctx, data.LongURL, requestID)
 		if err != nil {
@@ -244,7 +248,9 @@ func (h *GatewayHandler) GetOriginal(w http.ResponseWriter, r *http.Request) {
 */
 
 func (h *GatewayHandler) GetOriginal(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
+	//ctx := r.Context()
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Minute)
+	defer cancel()
 	requestID := middleware.GetRequestID(ctx)
 
 	shortCode, ok := mux.Vars(r)["shorted_url"]
@@ -263,7 +269,7 @@ func (h *GatewayHandler) GetOriginal(w http.ResponseWriter, r *http.Request) {
 
 	// 1. Пробуем получить длинный URL из кэша
 	longURL, err := h.urlcache.GetLongURL(ctx, numericID)
-	if err != nil {
+	if err != nil || len(longURL) == 0 {
 		// Кэш-мисс или сбой кэша: идем в базу данных
 		longURL, err = h.dbrestorer.Restore(ctx, numericID)
 		if err != nil {
