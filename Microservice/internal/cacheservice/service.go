@@ -96,7 +96,6 @@ func (s *UrlCacheService) WriteURLPair(ctx context.Context, shortURL int64, long
 		// Найдено! Возвращаем созданный ранее короткий URL
 		return existingShort, nil
 	}
-
 	// ЗАПИСЬ КОРОТКОЙ ССЫЛКИ: Используем SetNX
 	// Он вернет true, если ключ успешно создан, и false, если такой shortCode уже кем-то занят
 	// success, err := s.client.SetNX(ctx, shortKey, longURL, s.ttl).Result()

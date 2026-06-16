@@ -23,8 +23,8 @@ type CacheConfig struct {
 	DataTTL          time.Duration
 }
 
-func GetURLCacheConfig() CacheConfig {
-	return CacheConfig{
+func GetURLCacheConfig() *CacheConfig {
+	return &CacheConfig{
 		Port:      config.GetEnv("PORT", "50057"),
 		RedisPort: config.GetEnv("PORT", "6379"),
 		Host:      config.GetEnv("HOST", "127.0.0.1"),
