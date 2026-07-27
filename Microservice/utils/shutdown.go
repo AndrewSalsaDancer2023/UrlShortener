@@ -48,7 +48,6 @@ func ShutdownResourceParallel(ctx context.Context, wg *sync.WaitGroup, errBuffer
 		select {
 		case <-done:
 			if closeErr != nil {
-				// Ошибка самой базы данных при закрытии
 				wrappedErr := fmt.Errorf("closing error %s: %w", resourceName, closeErr)
 				errBuffer.Append(wrappedErr)
 			} else {

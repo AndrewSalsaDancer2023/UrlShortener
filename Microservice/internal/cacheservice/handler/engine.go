@@ -9,7 +9,6 @@ import (
 	"os"
 	"os/signal"
 
-	"sync"
 	"syscall"
 	"time"
 	"urlshortener/internal/cacheservice"
@@ -38,6 +37,13 @@ type CacheService struct {
 func (s *CacheService) Config() *config.CacheConfig {
 	if s.config == nil {
 		s.config = config.GetURLCacheConfig()
+
+		utils.AddFinalizerFunction("redis", func() error {
+			if s.Cache() != nil {
+				s.Cache().Close()
+			}
+			return nil
+		})
 	}
 	return s.config
 }
@@ -54,6 +60,14 @@ func (s *CacheService) Config() *config.CacheConfig {
 func (s *CacheService) Cache() srv.UrlCache {
 	if s.cache == nil {
 		s.cache = cacheservice.New(s.Config())
+
+		utils.AddFinalizerFunction("connection listener", func() error {
+			list, _ := s.Listener()
+			if list != nil {
+				return list.Close()
+			}
+			return nil //соединение не открыто, закрывать нечего
+		})
 	}
 
 	return s.cache
@@ -88,7 +102,15 @@ func (s *CacheService) Listener() (net.Listener, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to listen port %s: %w", s.Config().Port, err)
 		}
+
 		s.listener = lis
+		utils.AddFinalizerFunction("connection listener", func() error {
+			list, _ := s.Listener()
+			if list != nil {
+				return list.Close()
+			}
+			return nil //соединение не открыто, закрывать нечего
+		})
 	}
 
 	return s.listener, nil
@@ -96,35 +118,39 @@ func (s *CacheService) Listener() (net.Listener, error) {
 
 func (a *CacheService) Close() {
 	// ////////////////////////////////////
-	var wg sync.WaitGroup
+	// var wg sync.WaitGroup
 	// Общий таймаут на закрытие каждого ресурса — 5 секунд
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer shutdownCancel()
-
-	var errBuf utils.SafeErrorBuffer
-	// 1. Закрываем соединение с grpc
-	utils.ShutdownResourceParallel(shutdownCtx, &wg, &errBuf, "connection listener", func() error {
-		list, _ := a.Listener()
-		if list != nil {
-			return list.Close()
-		}
-		return nil //соединение не открыто, закрывать нечего
-	})
-
-	// 2. Закрываем Redis (в том же самом контексте или создав новый)
-	utils.ShutdownResourceParallel(shutdownCtx, &wg, &errBuf, "connection listener", func() error {
-		if a.Cache() != nil {
-			a.Cache().Close()
-		}
-		return nil
-	})
-
-	wg.Wait()
-	if len(errBuf.GetErrors()) != 0 {
-		log.Printf("Errors during closing %s", errors.Join(errBuf.GetErrors()...))
-	} else {
-		log.Println("All low-level resources closed.")
+	if err := utils.CloseAll(shutdownCtx); err != nil {
+		log.Printf("Errors during closing %v", err)
+		return
 	}
+	log.Println("All low-level resources closed.")
+	// var errBuf utils.SafeErrorBuffer
+	// // 1. Закрываем соединение с grpc
+	// utils.ShutdownResourceParallel(shutdownCtx, &wg, &errBuf, "connection listener", func() error {
+	// 	list, _ := a.Listener()
+	// 	if list != nil {
+	// 		return list.Close()
+	// 	}
+	// 	return nil //соединение не открыто, закрывать нечего
+	// })
+
+	// // 2. Закрываем Redis (в том же самом контексте или создав новый)
+	// utils.ShutdownResourceParallel(shutdownCtx, &wg, &errBuf, "redis", func() error {
+	// 	if a.Cache() != nil {
+	// 		a.Cache().Close()
+	// 	}
+	// 	return nil
+	// })
+
+	// wg.Wait()
+	// if len(errBuf.GetErrors()) != 0 {
+	// 	log.Printf("Errors during closing %s", errors.Join(errBuf.GetErrors()...))
+	// } else {
+	// 	log.Println("All low-level resources closed.")
+	// }
 }
 
 func (a *CacheService) Run(ctx context.Context) error {
