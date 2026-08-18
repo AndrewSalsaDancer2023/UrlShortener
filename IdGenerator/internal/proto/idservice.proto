@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package generator;
+
+option go_package = "./proto/idservice";
+
+// IDService раздаёт клиентам пачки уникальных идентификаторов
+// из предварительно заполненного буфера.
+service IDService {
+  rpc GetIDBatch (GetBatchRequest) returns (GetBatchResponse);
+}
+
+
+message GetBatchRequest {}
+
+message GetBatchResponse {
+  repeated int64 ids = 1;
+}

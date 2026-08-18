@@ -1,0 +1,79 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Gateway (API)",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}/cmd/gateway"
+        },
+        {
+            "name": "ID Generator 1",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}/cmd/idgenservice",
+            "args": [
+                "--port=50051",
+                "--dc-id=0",
+                "--mach-id=0"
+            ]
+        },
+        {
+            "name": "ID Generator 2",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}/cmd/idgenservice",
+            "args": [
+                "--port=50052",
+                "--dc-id=0",
+                "--mach-id=1"
+            ]
+        },
+        {
+            "name": "Shortener service 1",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}/cmd/shortenerservice",
+            "args": [
+                "--port=50053"
+            ]
+        },
+        {
+            "name": "Restorer service 1",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}/cmd/restorerservice",
+            "args": [
+                "--port=50054"
+            ]
+        },
+        {
+            "name": "Cache service 1",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}/cmd/cacheservice",
+            "args": [
+                "--port=50057"
+            ]
+        },
+        {
+            "name": "Client ID Gen",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}/client/idgenerator"
+        }
+    ],
+    "compounds": [
+        {
+            "name": "run all",
+            "configurations": ["Gateway (API)", "ID Generator 1", "ID Generator 2", "Shortener service 1", "Restorer service 1", "Cache service 1", "Client ID Gen"]
+        }
+    ]
+}
