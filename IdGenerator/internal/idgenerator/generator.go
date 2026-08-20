@@ -125,25 +125,6 @@ func (g *Generator) waitNextTime(now int64, last int64) int64 {
 	return now
 }
 
-/*
-func (g *Generator) NextBatch(n int) (IDBatch, error) {
-
-	if n <= 0 {
-		return nil, nil
-	}
-
-	batch := make(IDBatch, n)
-	for i := range n {
-		id, err := g.NextID()
-		if err != nil {
-			return nil, err
-		}
-		batch[i] = id
-	}
-	return batch, nil
-}
-*/
-
 func (g *Generator) NextBatch(n int) (IDBatch, error) {
 	if n <= 0 {
 		return nil, nil

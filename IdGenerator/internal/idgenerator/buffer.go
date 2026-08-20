@@ -17,39 +17,32 @@ import (
 	"context"
 )
 
+// IDBuffer описывает методы, которые нужны обработчику
+type IDBuffer interface {
+	Push(ctx context.Context, batch IDBatch) error
+	TakeBatch(ctx context.Context) (IDBatch, error)
+}
+
 type Buffer struct {
 	ch chan IDBatch
+	IDBuffer
 }
 
-// NewBuffer создаёт буфер общей ёмкостью bufferSize элементов,
-// хранимых батчами по batchSize штук. Ёмкость канала в батчах:
-// bufferSize/batchSize (например, 1000/250 = 4 слота).
-func NewBuffer(bufferSize, batchSize int) *Buffer {
-	slots := bufferSize / batchSize
-	if slots < 1 {
-		slots = 1
+// NewBuffer создаёт буфер напрямую по числу готовых
+// батчей. Нам нужно иметь несколько готовых батчей,
+// например, в client.Pool
+func NewBuffer(batches int) IDBuffer {
+	//	slots := bufferSize / batchSize
+	if batches < 1 {
+		batches = 1
 	}
 	// metrics.BufferCapacity.Set(float64(slots))
 
-	return &Buffer{ch: make(chan IDBatch, slots)}
+	return &Buffer{ch: make(chan IDBatch, batches)}
 }
 
-// NewBufferWithSlots создаёт буфер напрямую по числу слотов (готовых
-// батчей), без пересчёта из bufferSize/batchSize. Полезно там, где
-// единица "сколько батчей держать наготове" естественна сама по себе —
-// например, в client.Pool, где реальный размер батча определяет
-// удалённый gRPC-сервис, а не сам буфер.
-func NewBufferWithSlots(slots int) *Buffer {
-	if slots < 1 {
-		slots = 1
-	}
-	// metrics.BufferCapacity.Set(float64(slots))
-
-	return &Buffer{ch: make(chan IDBatch, slots)}
-}
-
-// Push кладёт готовый батч в буфер. Блокируется, если все слоты заняты,
-// пока consumer не освободит место (TakeBatch) либо не отменится ctx.
+// Push помещает готовый батч в буфер. Блокируется, если все слоты заняты,
+// пока consumer не освободит место (TakeBatch) либо не отменится контекст ctx.
 func (b *Buffer) Push(ctx context.Context, batch IDBatch) error {
 	// start := time.Now()
 	select {
@@ -81,9 +74,3 @@ func (b *Buffer) TakeBatch(ctx context.Context) (IDBatch, error) {
 		return nil, ctx.Err()
 	}
 }
-
-// Level возвращает текущее число готовых батчей в буфере (для health/debug).
-func (b *Buffer) Level() int { return len(b.ch) }
-
-// Capacity возвращает ёмкость буфера в батчах.
-func (b *Buffer) Capacity() int { return cap(b.ch) }

@@ -12,11 +12,11 @@ type GRPCHandler struct {
 	pb.UnimplementedIDServiceServer
 
 	// Внедряем сервис бизнес-логики как зависимость
-	buffer *idgenerator.Buffer
+	buffer idgenerator.IDBuffer
 }
 
 // New — конструктор для создания вашего gRPC-обработчика
-func NewHandler(buf *idgenerator.Buffer) *GRPCHandler {
+func NewHandler(buf idgenerator.IDBuffer) *GRPCHandler {
 	return &GRPCHandler{
 		buffer: buf,
 	}
@@ -30,15 +30,3 @@ func (h *GRPCHandler) GetIDBatch(ctx context.Context, req *pb.GetBatchRequest) (
 	}
 	return &pb.GetBatchResponse{Ids: batch}, nil
 }
-
-/*
-func (h *GRPCHandler) GetNextID(ctx context.Context, req *pb.IDRequest) (*pb.IDResponse, error) {
-	id, err := h.gsv.Generate()
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate id: %w", err)
-	}
-
-	result := &pb.IDResponse{Id: id.NumericID, Code: id.ShortCode}
-	return result, nil
-}
-*/

@@ -10,8 +10,8 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log"
-	"os"
 	"os/signal"
 	"sync"
 	"syscall"
@@ -23,6 +23,7 @@ import (
 
 	client "urlshortener/internal/idgenerator/client"
 	pb "urlshortener/internal/proto/idservice"
+	"urlshortener/utils"
 )
 
 var (
@@ -35,100 +36,105 @@ var (
 
 func main() {
 
-	logFileName := "grpc_client" + ".log"
-	logFile, err := os.OpenFile(logFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		log.Fatalf("Не удалось открыть файл логов %s: %v", logFileName, err)
-		return
-	}
-	// Обязательно закрываем файл при завершении работы всего приложения
+	// 1. Инициализируем логирование
+	logFile := utils.CreateLogFile("grpc_client.log")
 	defer logFile.Close()
 	log.SetOutput(logFile)
 
+	// 2. Настраиваем системный контекст для Ctrl+C / SIGTERM
 	// ctx на всё приложение: Ctrl+C/SIGTERM корректно останавливают
 	// как цикл получения ID, так и graceful-закрытие пула/соединения.
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	var wg sync.WaitGroup
-	// 1. Устанавливаем gRPC-соединение с сервисом.
-	//    insecure.NewCredentials() — без TLS, т.к. сервис из этого проекта
-	//    поднимается без него; для прода замените на реальные credentials.
-	dialCtx, dialCancel := context.WithTimeout(ctx, dialTimeout)
-	defer dialCancel()
-
-	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	// 3. Подключаемся к gRPC серверу
+	conn, err := setupClientgRPCConnection(ctx, addr, dialTimeout)
 	if err != nil {
-		log.Printf("failed to create grpc client for %s: %v", addr, err)
+		log.Printf("Unable to establish gRPC connection: %v", err)
 		return
 	}
 	defer conn.Close()
 
-	// Явно дожидаемся установления соединения, чтобы сразу увидеть
-	// ошибку конфигурации/недоступности сервиса, а не на первом NextID.
-	conn.Connect()
-	if !waitForReady(dialCtx, conn) {
-		log.Printf("connection to %s did not become ready within %s", addr, dialTimeout)
-		return
-	}
-
-	// 2. Создаём сгенерированный gRPC-клиент сервиса.
+	// 4. Инициализируем клиент и пул предвыборки ID
+	var wg sync.WaitGroup
 	grpcClient := pb.NewIDServiceClient(conn)
-
-	// 3. Оборачиваем его в client.Pool — с этого момента в фоне уже
-	//    запущена предвыборка батчей (см. internal/client/pool.go).
 	pool := client.NewPool(ctx, grpcClient, lookaheadBatches, rpcTimeout, &wg)
 	defer pool.Close()
 
-	log.Printf("connected to %s, lookahead=%d batches, requesting IDs...", addr, lookaheadBatches)
+	log.Printf("Connected to %s, prefetching=%d batches. ID request...", addr, lookaheadBatches)
 
-	// 4. Получаем ID в цикле.
+	// 5. Запускаем основной цикл получения ID
+	runIDConsumerLoop(ctx, pool, count)
+
+	// 6. Выполняем Graceful Shutdown для фоновых горутин пула
+	waitForShutdown(&wg, dialTimeout)
+}
+
+// setupClientgRPCConnection создает gRPC-соединение и блокирует поток до тех пор, пока оно не станет Ready.
+func setupClientgRPCConnection(ctx context.Context, address string, timeout time.Duration) (*grpc.ClientConn, error) {
+	dialCtx, dialCancel := context.WithTimeout(ctx, timeout)
+	defer dialCancel()
+
+	conn, err := grpc.NewClient(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return nil, err
+	}
+
+	conn.Connect()
+	if !waitForConnectionReady(dialCtx, conn) {
+		conn.Close()
+		return nil, errors.New("Connection did not reach the READY status within the allotted time")
+	}
+
+	return conn, nil
+}
+
+// runIDConsumerLoop запрашивает пачки ID из пула согласно лимиту count.
+func runIDConsumerLoop(ctx context.Context, pool *client.Pool, maxCount int) {
 	got := 0
-	for count == 0 || got < count {
+	for maxCount == 0 || got < maxCount {
 		id, err := pool.NextID(ctx)
 		if err != nil {
 			if ctx.Err() != nil {
-				log.Printf("stopped: %v", ctx.Err())
+				log.Printf("The loop execution was stopped by the context signal: %v", ctx.Err())
 				break
 			}
-			log.Printf("NextID failed: %v", err)
+			log.Printf("NextID method error: %v", err)
 			break
 		}
 
-		log.Printf("id=%d", id)
+		log.Printf("Successfully received id=%d", id)
 		got++
 		time.Sleep(1 * time.Second)
 	}
+	log.Printf("Cycle completed: %d identifiers received in total", got)
+}
 
-	log.Printf("done: received %d ids", got)
-
-	pool.Close()
-
-	// 5. Даем время на плавное закрытие всего приложения
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+// waitForShutdown ожидает завершения всех фоновых задач в WaitGroup с таймаутом.
+func waitForShutdown(wg *sync.WaitGroup, timeout time.Duration) {
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	// Канал для отслеживания завершения всех горутин (включая пул)
 	done := make(chan struct{})
 	go func() {
-		wg.Wait() // Ждем, пока отработает defer wg.Done() внутри пула
+		wg.Wait()
 		close(done)
 	}()
 
 	select {
 	case <-done:
-		log.Println("Фоновая горутина пула успешно завершила работу.")
+		log.Println("Gorutines finished")
 	case <-shutdownCtx.Done():
-		log.Println("Внимание: таймаут завершения превышен, принудительный выход.")
+		log.Println("Waiting timeout expired. Force finish")
 	}
 }
 
-// waitForReady ждёт, пока conn перейдёт в состояние Ready, либо пока не
+// waitForConnectionReady ждёт, пока conn перейдёт в состояние Ready, либо пока не
 // истечёт ctx. Возвращает false при таймауте/отмене.
-func waitForReady(ctx context.Context, conn *grpc.ClientConn) bool {
+func waitForConnectionReady(ctx context.Context, conn *grpc.ClientConn) bool {
 	for {
 		state := conn.GetState()
-		if state == connectivity.Ready { // ИСПРАВЛЕНО: типизированная проверка
+		if state == connectivity.Ready {
 			return true
 		}
 		if !conn.WaitForStateChange(ctx, state) {

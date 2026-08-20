@@ -65,7 +65,7 @@ func (g *rpcGenerator) NextBatch(_ int) (idgenerator.IDBatch, error) {
 
 // Pool — клиентский локальный пул ID с предвыборкой.
 type Pool struct {
-	buf *idgenerator.Buffer
+	buf idgenerator.IDBuffer
 
 	mu      sync.Mutex
 	current idgenerator.IDBatch
@@ -90,7 +90,7 @@ func NewPool(ctx context.Context, client BatchFetcher, lookaheadBatches int, rpc
 		lookaheadBatches = 1
 	}
 
-	buf := idgenerator.NewBufferWithSlots(lookaheadBatches)
+	buf := idgenerator.NewBuffer(lookaheadBatches)
 
 	cancelCtx, cancel := context.WithCancel(ctx)
 	gen := &rpcGenerator{client: client, ctx: cancelCtx, timeout: rpcTimeout}

@@ -10,6 +10,7 @@ package idgenerator
 
 import (
 	"context"
+	"fmt"
 	"log"
 	// "idgen-service/internal/buffer"
 	// "idgen-service/internal/metrics"
@@ -28,14 +29,15 @@ import (
 // на этот контракт при принятии решения о retry.
 
 type Producer struct {
-	gen       BatchGenerator
-	buf       *Buffer
+	gen BatchGenerator
+	// buf       *Buffer
+	buf       IDBuffer
 	batchSize int
 }
 
 // New создаёт Producer, который будет генерировать батчи размером
 // batchSize через gen и складывать их в buf.
-func NewProducer(gen BatchGenerator, buf *Buffer, batchSize int) *Producer {
+func NewProducer(gen BatchGenerator, buf IDBuffer, batchSize int) *Producer {
 	p := &Producer{
 		gen:       gen,
 		buf:       buf,
@@ -68,26 +70,33 @@ func NewProducer(gen BatchGenerator, buf *Buffer, batchSize int) *Producer {
 // из цикла.
 //
 // Предназначен для запуска в отдельной горутине: go p.Run(ctx).
-func (p *Producer) Run(ctx context.Context) {
+func (p *Producer) Run(ctx context.Context) (err error) {
+
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("[CRITICAL] Producer run fall with panic: %v.", r)
+			err = fmt.Errorf("producer panic: %v", r)
+		}
+	}()
 
 	for {
 		// Проверяем, не завершен ли контекст перед генерацией новой пачки
-		if err := ctx.Err(); err != nil {
-			print("Shutting down Run  with error: %v", err)
-			return
+		if err = ctx.Err(); err != nil {
+			log.Printf("Shutting down Run  with error: %v", err)
+			return err
 		}
 
-		batch, err := p.gen.NextBatch(p.batchSize)
-		if err != nil {
+		batch, batchErr := p.gen.NextBatch(p.batchSize)
+		if batchErr != nil {
 			// metrics.GenerationErrors.Inc()
-			return
+			return batchErr
 
 		}
-		log.Println("Generated next batch")
+		//log.Println("Generated next batch")
 		if pushErr := p.buf.Push(ctx, batch); pushErr != nil {
 			// ctx отменён/просрочен, пока Push ждал место в буфере —
 			// корректно завершаем горутину, ничего не "теряя" молча.
-			return
+			return fmt.Errorf("buffer push failed: %w", pushErr)
 		}
 	}
 }
