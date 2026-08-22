@@ -12,6 +12,7 @@ var (
 	ErrDataCenterID     = errors.New("datacenterID must be between 0 and 3")
 	ErrMachineID        = errors.New("machineID must be between 0 and 1")
 	ErrClockBackward    = errors.New("clock moved backwards, refusing to generate ID")
+	ErrInvalidBatchSize = errors.New("Invalid batch size specified")
 )
 
 const (
@@ -127,7 +128,7 @@ func (g *Generator) waitNextTime(now int64, last int64) int64 {
 
 func (g *Generator) NextBatch(n int) (IDBatch, error) {
 	if n <= 0 {
-		return nil, nil
+		return nil, ErrInvalidBatchSize
 	}
 
 	// 1. Выделяем память до блокировки мьютекса,

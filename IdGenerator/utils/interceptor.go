@@ -20,16 +20,11 @@ func EnforceDeadlineInterceptor( /*defaultTimeout time.Duration*/ ) grpc.UnarySe
 		_, hasDeadline := ctx.Deadline()
 
 		if !hasDeadline {
-			// // ВАРИАНТ А: Автоматически подставляем безопасный таймаут по умолчанию (Рекомендуется)
-			// var cancel context.CancelFunc
-			// ctx, cancel = context.WithTimeout(ctx, defaultTimeout)
-			// defer cancel()
-
-			// ВАРИАНТ Б: Если вы хотите быть строгими и сразу «отшивать» клиента, раскомментируйте код ниже:
+			//  отклоняем запрос клиента, влзвращая ошибку
 			return nil, status.Error(codes.InvalidArgument, "gRPC deadline must be specified by the client")
 		}
 
-		// 2. Передаем защищенный контекст дальше в ваш реальный обработчик сервиса
+		// 2. Передаем контекст дальше в обработчик сервиса
 		return handler(ctx, req)
 	}
 }
