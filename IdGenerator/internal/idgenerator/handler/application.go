@@ -18,6 +18,8 @@ import (
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/recovery"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/health"
+	healthgrpc "google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/status"
 )
 
@@ -57,9 +59,18 @@ func NewApp(cfg config.Config, buf idgenerator.IDBuffer, gen idgenerator.BatchGe
 		),
 	)
 
-	// 4. Регистрация обработчиков
+	// 4. Добавляем функции проверки здоровья
+	healthServer := health.NewServer()
+	healthServer.SetServingStatus("liveness", healthgrpc.HealthCheckResponse_SERVING)
+
+	// Но приложение пока НЕ ГОТОВО принимать трафик клиентов (Readiness = NOT_SERVING)
+	// так как мы, например, ещё не заполнили буфер ID или не проверили сеть
+	healthServer.SetServingStatus("readiness", healthgrpc.HealthCheckResponse_SERVING)
+
+	// 5. Регистрация обработчиков
 	grpcHandler := NewHandler(buf)
 	pb.RegisterIDServiceServer(gRPCServer, grpcHandler)
+	healthgrpc.RegisterHealthServer(gRPCServer, healthServer)
 
 	return &App{
 		grpcServer: gRPCServer,

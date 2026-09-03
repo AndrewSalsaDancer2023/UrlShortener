@@ -1,0 +1,63 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: idgen-headless
+  labels:
+    app: idgen
+spec:
+  # clusterIP: None делает сервис Headless. Обязательно для StatefulSet
+  # и для правильного резолва адресов в gRPC клиентах.
+  clusterIP: None 
+  selector:
+    app: idgen
+  ports:
+    - name: grpc
+      port: 50051
+      targetPort: 50051
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: idgen
+spec:
+  serviceName: "idgen-headless"
+  replicas: 2 # Запустит два пода: idgen-0 и idgen-1
+  selector:
+    matchLabels:
+      app: idgen
+  template:
+    metadata:
+      labels:
+        app: idgen
+    spec:
+      containers:
+        - name: idgen-service
+          # Замените на имя вашего собранного образа
+          image: andrew/idgen:latest 
+          imagePullPolicy: IfNotPresent # Для локального тестирования в Minikube/Kind
+          ports:
+            - containerPort: 50051
+              name: grpc
+          
+          # Переменные окружения, которые КУБЕРНЕТЕС передает внутрь Go-кода
+          env:
+            # Назначаем порт динамически. Изменив его тут, код сам перестроится.
+            - name: PORT
+              value: "50051"
+         
+
+          # Проверки здоровья (Probes). Kubernetes использует gRPC-проверку,
+          # чтобы знать, готов ли ваш Snowflake выдавать ID.
+          # Для этого в Go должен быть подключен стандартный "google.golang.org/grpc/health"
+          readinessProbe:
+            grpc:
+              port: 50051
+              service: "readiness" # Робот K8s спросит: "Как там дела у readiness?"
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          livenessProbe:
+            grpc:
+              port: 50051
+              service: "liveness"  # Робот K8s спросит: "Как там дела у liveness?"
+            initialDelaySeconds: 5
+            periodSeconds: 10

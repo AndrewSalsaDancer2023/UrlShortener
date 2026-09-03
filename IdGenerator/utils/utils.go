@@ -43,6 +43,53 @@ func CreateDebugLevelString(lvl logging.Level) string {
 	}
 }
 
+// Пытается получить номер пода
+func ExtractPodNumber(hostName string) (int64, error) {
+	// Находим последний дефис в имени хоста
+	lastDash := strings.LastIndex(hostName, "-")
+	if lastDash == -1 || lastDash == len(hostName)-1 {
+		// Если дефиса нет, значит код запущен локально (например, на Windows/Mac)
+		// Возвращаем ошибку или дефолтный ID для локальной разработки
+		return 0, fmt.Errorf("hostname %s does not contain a valid pod index", hostName)
+	}
+
+	// Вырезаем подстроку после дефиса (например, из "idgen-1" получим "1")
+	indexStr := hostName[lastDash+1:]
+
+	nodeID, err := strconv.ParseInt(indexStr, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse node ID from substring %s: %w", indexStr, err)
+	}
+
+	return nodeID, nil
+}
+
+// считывает имя хоста пода и извлекает его порядковый номер
+func ExtractNodeID() (int64, error) {
+	// В Kubernetes StatefulSet hostname всегда равен имени пода (например, "idgen-0")
+	hostName, err := os.Hostname()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get hostname: %w", err)
+	}
+
+	return ExtractPodNumber(hostName)
+}
+
+func ExtractMachineAndDataCenterID(nodeId int64) (datacenterID int64, machineID int64) {
+	datacenterID = nodeId >> 1 // сдвиг на 1 бит вправо даст ID датацентра
+	machineID = nodeId & 1     // остаток даст ID машины
+	return datacenterID, machineID
+}
+
+// Функция-помощник для установки дефолтного значения
+func getEnv(key, defaultValue string) string {
+	value := os.Getenv(key) // Ищет строго в том регистре, что в env
+	if len(value) == 0 {
+		return defaultValue
+	}
+	return value
+}
+
 func ReadJSONFile(filePath string) (string, error) {
 	//1. Читаем файл с диска
 	data, err := os.ReadFile(filePath)

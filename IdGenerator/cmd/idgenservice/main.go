@@ -24,12 +24,28 @@ const (
 func main() {
 	// 1. Загружаем конфигурацию
 	cfg := config.Load()
+	log.SetOutput(os.Stdout)
+	//port := os.Getenv("PORT")
+
+	if nodeId, err := utils.ExtractNodeID(); err != nil {
+		log.Printf("failed to extract nodeId: %v", err)
+		return
+	} else {
+		datacenterID, machineID := utils.ExtractMachineAndDataCenterID(nodeId)
+		log.Printf("starting with mach Id: %d and node Id: %d", datacenterID, machineID)
+		cfg.SetDataCenterAndMachineID(datacenterID, machineID)
+	}
+
+	port := os.Getenv("PORT")
+	if len(port) != 0 {
+		cfg.SetPort(port)
+	}
 
 	// 2. Настройка gRPC-слоя и Перехватчиков (Middleware)
 	// Обязательно закрываем файл при завершении работы всего приложения
-	logFile := utils.CreateLogFile("grpc_server" + cfg.Port + ".log")
-	defer logFile.Close()
-	log.SetOutput(logFile)
+	// logFile := utils.CreateLogFile("grpc_server" + cfg.Port + ".log")
+	// defer logFile.Close()
+	// log.SetOutput(logFile)
 
 	timeEngine := pool.UnixTimeReal{}
 	// 3. Создаем генератор, буфер и продюсер
