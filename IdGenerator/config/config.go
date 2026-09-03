@@ -17,6 +17,15 @@ type Config struct {
 	// Epoch        int64 // Unix ms; 0 = TwitterEpoch
 }
 
+func (cfg *Config) SetDataCenterAndMachineID(DatacenterID int64, MachineID int64) {
+	cfg.DatacenterID = DatacenterID
+	cfg.MachineID = MachineID
+}
+
+func (cfg *Config) SetPort(Port string) {
+	cfg.Port = Port
+}
+
 func Load() Config {
 
 	portFlag := flag.String("port", config.GetEnv("PORT", "50051"), "gRPC server port")
