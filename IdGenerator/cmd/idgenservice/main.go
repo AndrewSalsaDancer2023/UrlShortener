@@ -17,8 +17,8 @@ import (
 )
 
 const (
-	buffersize = 3 //10
-	batchsize  = 3 //250
+	buffersize = 50 //10
+	batchsize  = 3  //250
 )
 
 func main() {

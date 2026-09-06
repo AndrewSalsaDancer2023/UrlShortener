@@ -23,11 +23,17 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+const (
+	lowWatermark = 5
+)
+
 type App struct {
-	grpcServer *grpc.Server
-	producer   *idgenerator.Producer // Предполагается наличие метода Run(ctx)
-	wg         sync.WaitGroup
-	port       string
+	grpcServer    *grpc.Server
+	healthServer  *health.Server
+	producer      *idgenerator.Producer // Предполагается наличие метода Run(ctx)
+	wg            sync.WaitGroup
+	port          string
+	readinessChan *chan int
 }
 
 func NewApp(cfg config.Config, buf idgenerator.IDBuffer, gen idgenerator.BatchGenerator, batchsize int) *App {
@@ -65,7 +71,7 @@ func NewApp(cfg config.Config, buf idgenerator.IDBuffer, gen idgenerator.BatchGe
 
 	// Но приложение пока НЕ ГОТОВО принимать трафик клиентов (Readiness = NOT_SERVING)
 	// так как мы, например, ещё не заполнили буфер ID или не проверили сеть
-	healthServer.SetServingStatus("readiness", healthgrpc.HealthCheckResponse_SERVING)
+	healthServer.SetServingStatus("readiness", healthgrpc.HealthCheckResponse_NOT_SERVING)
 
 	// 5. Регистрация обработчиков
 	grpcHandler := NewHandler(buf)
@@ -73,9 +79,10 @@ func NewApp(cfg config.Config, buf idgenerator.IDBuffer, gen idgenerator.BatchGe
 	healthgrpc.RegisterHealthServer(gRPCServer, healthServer)
 
 	return &App{
-		grpcServer: gRPCServer,
-		producer:   producer,
-		port:       cfg.Port,
+		grpcServer:   gRPCServer,
+		healthServer: healthServer,
+		producer:     producer,
+		port:         cfg.Port,
 	}
 }
 
@@ -100,6 +107,8 @@ func (a *App) Run(ctx context.Context, lis net.Listener) error {
 		// close(errChan)
 	}()
 
+	go a.monitorBufferReadiness(ctx, lowWatermark)
+
 	// Ожидаем сигнала отмены контекста (Ctrl+C / SIGTERM) или ошибки сервера
 	select {
 	case <-ctx.Done():
@@ -107,6 +116,7 @@ func (a *App) Run(ctx context.Context, lis net.Listener) error {
 		return a.Stop()
 	case err := <-errChan:
 		log.Printf("selected case err := <-errChan:")
+		a.healthServer.SetServingStatus("liveness", healthgrpc.HealthCheckResponse_NOT_SERVING)
 		return err
 	}
 }
@@ -147,4 +157,33 @@ func (a *App) Stop() error {
 
 	log.Println("gRPC server stopped")
 	return nil
+}
+
+func (a *App) monitorBufferReadiness(ctx context.Context, lowWatermark int) {
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+
+	currServing := true
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			curLength := a.producer.GetNumBatches()
+			if curLength < lowWatermark {
+				if currServing {
+					a.healthServer.SetServingStatus("readiness", healthgrpc.HealthCheckResponse_NOT_SERVING)
+					log.Printf("Buffer is running low: (%d) batches", curLength)
+					currServing = false
+				}
+			} else {
+				if !currServing {
+					a.healthServer.SetServingStatus("readiness", healthgrpc.HealthCheckResponse_SERVING)
+					log.Printf("Buffer recovered: (%d) batches", curLength)
+					currServing = true
+				}
+			}
+		}
+	}
 }

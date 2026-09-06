@@ -21,6 +21,7 @@ import (
 type IDBuffer interface {
 	Push(ctx context.Context, batch IDBatch) error
 	TakeBatch(ctx context.Context) (IDBatch, error)
+	GetNumBatches() int
 }
 
 type Buffer struct {
@@ -32,7 +33,6 @@ type Buffer struct {
 // батчей. Нам нужно иметь несколько готовых батчей,
 // например, в client.Pool
 func NewBuffer(batches int) IDBuffer {
-	//	slots := bufferSize / batchSize
 	if batches < 1 {
 		batches = 1
 	}
@@ -73,4 +73,8 @@ func (b *Buffer) TakeBatch(ctx context.Context) (IDBatch, error) {
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	}
+}
+
+func (b *Buffer) GetNumBatches() int {
+	return len(b.ch)
 }

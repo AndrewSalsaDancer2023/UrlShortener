@@ -33,7 +33,7 @@ spec:
       containers:
         - name: idgen-service
           # Замените на имя вашего собранного образа
-          image: andrew/idgen:latest 
+          image: practicalprogrammer123/idgen:v1
           imagePullPolicy: IfNotPresent # Для локального тестирования в Minikube/Kind
           ports:
             - containerPort: 50051

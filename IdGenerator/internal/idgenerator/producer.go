@@ -29,8 +29,7 @@ import (
 // на этот контракт при принятии решения о retry.
 
 type Producer struct {
-	gen BatchGenerator
-	// buf       *Buffer
+	gen       BatchGenerator
 	buf       IDBuffer
 	batchSize int
 }
@@ -45,6 +44,10 @@ func NewProducer(gen BatchGenerator, buf IDBuffer, batchSize int) *Producer {
 	}
 
 	return p
+}
+
+func (p *Producer) GetNumBatches() int {
+	return p.buf.GetNumBatches()
 }
 
 // Run — бесконечный цикл: сгенерировать батч -> положить в буфер.
@@ -92,7 +95,7 @@ func (p *Producer) Run(ctx context.Context) (err error) {
 			return batchErr
 
 		}
-		//log.Println("Generated next batch")
+
 		if pushErr := p.buf.Push(ctx, batch); pushErr != nil {
 			// ctx отменён/просрочен, пока Push ждал место в буфере —
 			// корректно завершаем горутину, ничего не "теряя" молча.
