@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: id-generator-client
+  labels:
+    app: generator-client
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: generator-client
+  template:
+    metadata:
+      labels:
+        app: generator-client
+    spec:
+      containers:
+        - name: idclient-service
+          # Замените на имя вашего собранного образа
+          image: practicalprogrammer123/idclient:v1
+          imagePullPolicy: IfNotPresent # Для локального тестирования в Minikube/Kind
+          ports:
+            - containerPort: 50051
+              name: grpc

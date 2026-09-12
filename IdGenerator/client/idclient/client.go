@@ -12,6 +12,7 @@ import (
 	pb "urlshortener/internal/proto/idservice"
 
 	"google.golang.org/grpc"
+	_ "google.golang.org/grpc/balancer/roundrobin" //для балансировки
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -71,7 +72,12 @@ func (a *IDConsumerApp) setupClientgRPCConnection(ctx context.Context) error {
 	dialCtx, dialCancel := context.WithTimeout(ctx, a.cfg.DialTimeout)
 	defer dialCancel()
 
-	conn, err := grpc.NewClient(a.cfg.Addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	// для kubernetes настроим конфигурацию сервиса для включения round robin балансировки
+	serviceConfig := `{"loadBalancingConfig": [{"round_robin":{}}]}`
+
+	// conn, err := grpc.NewClient(a.cfg.Addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(a.cfg.Addr, grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithDefaultServiceConfig(serviceConfig))
 	if err != nil {
 		return err
 	}

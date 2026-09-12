@@ -11,18 +11,19 @@ package main
 import (
 	"context"
 	"log"
+	"os"
 	"os/signal"
 	"syscall"
 	"time"
-
-	"urlshortener/utils"
+	// "urlshortener/utils"
 )
 
 func main() {
 	// 1. Инициализируем логирование
-	logFile := utils.CreateLogFile("grpc_client.log")
-	defer logFile.Close()
-	log.SetOutput(logFile)
+	// logFile := utils.CreateLogFile("grpc_client.log")
+	// defer logFile.Close()
+	// log.SetOutput(logFile)
+	log.SetOutput(os.Stdout)
 
 	// 2. Настраиваем системный контекст для Ctrl+C / SIGTERM
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -30,7 +31,8 @@ func main() {
 
 	// 3. Собираем конфигурацию
 	cfg := Config{
-		Addr:             "localhost:50051",
+		// Addr:             "localhost:50051",
+		Addr:             "dns:///idgen-headless:50051",
 		Count:            10,
 		LookaheadBatches: 2,
 		RPCTimeout:       2 * time.Second,
