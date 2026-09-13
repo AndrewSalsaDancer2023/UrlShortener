@@ -125,6 +125,7 @@ func (a *App) Run(ctx context.Context, lis net.Listener) error {
 func (a *App) Stop() error {
 	log.Println("Inside App Stop() shutting down gRPC server...")
 	a.healthServer.SetServingStatus("readiness", healthgrpc.HealthCheckResponse_NOT_SERVING)
+	time.Sleep(3 * time.Second)
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 

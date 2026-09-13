@@ -22,3 +22,6 @@ spec:
           ports:
             - containerPort: 50051
               name: grpc
+          env:
+           - name: IDGEN_SERVER_ADDRESS
+             value: "idgen-headless:50051"

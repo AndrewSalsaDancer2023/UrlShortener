@@ -29,10 +29,17 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
+	addr := os.Getenv("IDGEN_SERVER_ADDRESS")
+	if addr == "" {
+		addr = "localhost:50051"
+	} else {
+		addr = "dns:///" + addr
+	}
 	// 3. Собираем конфигурацию
 	cfg := Config{
 		// Addr:             "localhost:50051",
-		Addr:             "dns:///idgen-headless:50051",
+		// Addr:             "dns:///idgen-headless:50051",
+		Addr:             addr,
 		Count:            10,
 		LookaheadBatches: 2,
 		RPCTimeout:       2 * time.Second,

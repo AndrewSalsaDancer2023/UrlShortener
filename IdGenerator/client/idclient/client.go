@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log"
 	"sync"
@@ -82,11 +81,11 @@ func (a *IDConsumerApp) setupClientgRPCConnection(ctx context.Context) error {
 		return err
 	}
 
-	conn.Connect()
-	if !a.waitForConnectionReady(dialCtx, conn) {
-		conn.Close()
-		return errors.New("connection did not reach the READY status within the allotted time")
-	}
+	// conn.Connect()
+	// if !a.waitForConnectionReady(dialCtx, conn) {
+	// 	conn.Close()
+	// 	return errors.New("connection did not reach the READY status within the allotted time")
+	// }
 
 	a.conn = conn
 	return nil
