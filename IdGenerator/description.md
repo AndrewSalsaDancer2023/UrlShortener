@@ -24,11 +24,11 @@
 
 Если мы жестко зашьем вызовы new внутрь кода контейнера, скажем, std::vector, то лишим разработчиков возможности кастомизировать управление памятью. Именно для решения этой проблемы в стандартную библиотеку были введены аллокатор (std::allocator) и вспомогательный класс — std::allocator_traits.
 
-Давайте разберемся, как эти абстракции взаимодействуют между собой, как заставить их работать вместе, и как все-таки выделяется память для объектов. Так как интерфейс аллокаторов и их внутренние механизмы работы менялись со времен С++98 и материала довольно много, то сегодня рассмотрим только то, что относится к С++11.
+Давайте разберемся, как эти абстракции взаимодействуют между собой, как заставить их работать вместе, и как все-таки выделяется память для объектов. Так как интерфейс аллокаторов и их внутренние механизмы работы менялись со времен С++98 и материала довольно много, то сегодня рассмотрим философию, заложенную в C++11, но пример реализации напишем на C++20, чтобы не углубляться в шаблонный код.
 
 Как работает стандартный аллокатор std::allocator
 
-По умолчанию контейнеры STL (например, std::vector<int> или std::list<int>) используют аллокатор в качестве аргумента, принмающего значение по умолчанию std::allocator<T>. Его задача — отделить выделение физической памяти от конструирования объектов при помощи двух методов:
+По умолчанию контейнеры STL (например, std::vector<int> или std::list<int>) используют аллокатор в качестве аргумента, принимающего значение по умолчанию std::allocator<T>. Его задача — отделить выделение физической памяти от конструирования объектов при помощи двух методов:
 
 allocate(n). Выделяет блок памяти, достаточный для хранения n объектов типа T. Никакие конструкторы при этом не вызываются. Под капотом для этого используется стандартная системная функция operator new(size_t).
 
@@ -85,7 +85,7 @@ public:
         : name(monsterName), hp(monsterHp) {
         std::cout << "Constructor Monster " << name << " created with " << hp << " HP.\n";
     }
-    virtual void Attack() {/*some attack code*/}
+    virtual void Attack() {/* some attack code */}
     ~Monster() {
         std::cout << "Destructor Monster " << name << " is destroyed.\n";
     }
@@ -192,6 +192,7 @@ struct my_allocator_traits {
         if constexpr (HasConstruct<Alloc, T, Args...>) {
             a.construct(p, std::forward<Args>(args)...);
         } else {
+            std::cout << "my_allocator_traits calls placement new \n";
             ::new(static_cast<void*>(p)) T(std::forward<Args>(args)...);
         }
     }
@@ -202,6 +203,7 @@ struct my_allocator_traits {
         if constexpr (HasDestroy<Alloc, T>) {
             a.destroy(p);
         } else {
+            std::cout << "my_allocator_traits calls object destructor \n";
             p->~T();
         }
     }
@@ -282,12 +284,12 @@ struct verbose_allocator {
 
     template<typename... Args>
     void construct(T* p, Args&&... args) {
-        std::cout << "Verbose Allocator calls construct()\n";
+        std::cout << "Verbose Allocator construct \n";
         ::new((void*)p) T(std::forward<Args>(args)...);
     }
 
     void destroy(T* p) {
-        std::cout << "Verbose Allocator calls destroy()\n";
+        std::cout << "Verbose Allocator destroy \n";
         p->~T();
     }
 };
@@ -296,24 +298,24 @@ struct verbose_allocator {
 // Тестовый класс, который сообщает о своем создании
 struct Item {
     int id;
-    Item(int i) : id(i) { std::cout << "Item with id=" << id << "created \n"; }
-    ~Item() { std::cout << "Item with id=" << id << "destroyed \n"; }
+    Item(int i) : id(i) { std::cout << "Item with id=" << id << " created \n"; }
+    ~Item() { std::cout << "Item with id=" << id << " destroyed \n"; }
 };
 
 int main() {
-    std::cout << "1. ТЕСТ С МИНИМАЛЬНЫМ АЛЛОКАТОРОМ (Будет применен placement new по умолчанию) ---\n";
+    std::cout << "1. Test with custom_allocator placement new called \n";
     {
         SimpleVector<Item, custom_allocator<Item>> vec;
         vec.push_back(Item(1));
-        std::cout << "Удаляем элемент из вектора:\n";
+        std::cout << "Deleting element from vector \n";
         vec.pop_back();
-    } // Тут сработает деструктор вектора
+    }
 
-    std::cout << "\n 2. ТЕСТ С ЛОГИРУЮЩИМ АЛЛОКАТОРОМ (Вектор вызовет методы аллокатора) ---\n";
+    std::cout << "\n 2. Test with verbose_allocator (vector calls allocator methods) \n";
     {
         SimpleVector<Item, verbose_allocator<Item>> vec;
         vec.push_back(Item(2));
-        std::cout << "Удаляем элемент из вектора:\n";
+        std::cout << "Deleting element from vector \n";
         vec.pop_back();
     }
 
@@ -321,19 +323,21 @@ int main() {
 }
 Результат работы программы:
 
-1. ТЕСТ С МИНИМАЛЬНЫМ АЛЛОКАТОРОМ (Будет применен placement new по умолчанию) ---
-  [Item] Создан с id=1
-  [Item] Удален с id=1
-Удаляем элемент из вектора:
-  [Item] Удален с id=1
+1. Test with custom_allocator placement new called 
+Item with id=1 created 
+my_allocator_traits calls placement new 
+Item with id=1 destroyed 
+Deleting element from vector 
+my_allocator_traits calls object destructor 
+Item with id=1 destroyed 
 
---- 2. ТЕСТ С ЛОГИРУЮЩИМ АЛЛОКАТОРОМ (Вектор вызовет методы аллокатора) ---
-  [Item] Создан с id=2
--> [Verbose Allocator] Вызов кастомного construct()
-  [Item] Удален с id=2
-Удаляем элемент из вектора:
--> [Verbose Allocator] Вызов кастомного destroy()
-  [Item] Удален с id=2
+ 2. Test with verbose_allocator (vector calls allocator methods) 
+Item with id=2 created 
+Verbose Allocator construct 
+Item with id=2 destroyed 
+Deleting element from vector 
+Verbose Allocator destroy 
+Item with id=2 destroyed 
 Для полного просветления спустимся еще на один уровень ниже и посмотрим как устроен operator new под капотом.
 
 _GLIBCXX_WEAK_DEFINITION void *
@@ -372,6 +376,9 @@ Malloc выделяет памяти больше чем запрошено. П�
 
 Таким образом, malloc представляет универсальный механизм, который может выделять блоки памяти разных размеров. Для этого приходится выполнять поиск по ряду внутренних структур данных, что замедляет работу.
 
-В следующей статье рассмотрим как можно внедрить пользовательские аллокаторы и какой прирост производительности это даёт.
+В этой статье мы детально разобрали, как устроена работа с памятью в контейнерах C++, почему аллокатор использует allocator_traits и как выделяется память на уровне ОС.
 
+Malloc — это универсальная функция, но у универсальности есть обратная сторона — скорость. Какими бы быстрыми ни были современные системные аллокаторы, они всё равно тратят драгоценное время на поиск свободных чанков, что сказывается на скорости работы программы.
+
+В следующей статье перейдем от теории к практике и займемся оптимизацией. Мы напишем собственные кастомные аллокаторы, которые могут значительно ускорить ваш код.
 
